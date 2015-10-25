@@ -117,16 +117,6 @@ script.on_event(defines.events.on_tick, function(event)
 		if game.tick % 60 == 0 and game.map_settings.path_finder.max_steps_worked_per_tick > 100 then
 			game.map_settings.path_finder.max_steps_worked_per_tick = game.map_settings.path_finder.max_steps_worked_per_tick - 1
 		end
-		
-		if game.evolution_factor == 0.7 then
-			setExpansionState("viral_expanding")
-		end
-		if game.evolution_factor == 0.65 then
-			setExpansionState("beachhead")
-		end
-		if game.evolution_factor == 0.6 then
-			setExpansionState("assault")
-		end
 	else
 		local state = EXPANSION_STATES[global.expansion_state]
 		if not global.assault and state.attack_rate > 0 and game.tick % (state.attack_rate * 60) == 0 then
