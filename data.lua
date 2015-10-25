@@ -1,3 +1,5 @@
+require("prototypes.entity.power_short")
+
 data.raw["unit-spawner"]["biter-spawner"].pollution_absorbtion_absolute = 2
 data.raw["unit-spawner"]["biter-spawner"].pollution_absorbtion_proportional = 0.005
 

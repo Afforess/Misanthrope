@@ -14,6 +14,12 @@ function MapClass.new(logger)
     if not global.visitedRegions then
         global.visitedRegions = {}
     end
+    if not global.powerLineTargets then
+        global.powerLineTargets = {}
+    end
+    if not global.powerShorts then
+        global.powerShorts = {}
+    end
     global.enemyRegions = linked_list()
     return self
 end
@@ -21,6 +27,13 @@ end
 function Map:tick()
     self:iterateMap()
     self:iterateEnemyRegions()
+    if game.tick % 3600 == 0 then
+        self:updatePowerLines()
+    end
+    if game.tick % 60 == 0 then
+        self:checkPowerLinesForShorts()
+    end
+    self:updatePowerShorts()
 end
 
 BITER_TARGETS = {}
@@ -78,6 +91,9 @@ function Map:attackTargets(region)
         end
     end
     if highest_value_entity ~= nil then
+        if highest_value_entity.type == "electric-pole" then
+            self:trackPowerLine(highest_value_entity)
+        end
         self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
         highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.floor(highest_value) + 1, unit_search_distance = 256})
         return true
@@ -92,7 +108,7 @@ function Map:getDefenseLevel(position)
     local totalDefenses = 0
     local entityList = {}
     local turret_names = {"laser-turret", "gun-turret", "gun-turret-2"}
-    local turret_defense_value = {100000, 5000, 30000}
+    local turret_defense_value = {500000, 10000, 60000}
     local area = {lefttop = {x = position.x - 25, y = position.y - 25}, rightbottom = {x = position.x + 25, y = position.y + 25}}
     for i = 1, #turret_names do
         local turret_entities = game.surfaces.nauvis.find_entities_filtered({area = area, name = turret_names[i]})
@@ -103,12 +119,77 @@ function Map:getDefenseLevel(position)
             totalDefenses = totalDefenses + (defense_value / dist_squared)
         end
     end
-    return totalDefenses
+    return totalDefenses / 10000
+end
+
+function Map:trackPowerLine(entity)
+    for i = 1, #global.powerLineTargets do
+        if global.powerLineTargets[i].entity == entity then
+            return false
+        end
+    end
+    global.powerLineTargets[#global.powerLineTargets + 1] = {entity = entity, age = game.tick}
+    return true
+end
+
+function Map:checkPowerLinesForShorts()
+    for i = 1, #global.powerLineTargets do
+        if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
+            local powerLine = global.powerLineTargets[i].entity
+            local enemies = powerLine.surface.find_enemy_units(powerLine.position, 2)
+            self.l:log(#enemies .. " Nearby enemies to powerline at " .. self.l:toString(powerLine.position))
+            if #enemies > 0 then
+                local roll = math.random(1000)
+                if game.darkness > 0.5 then
+                    roll = math.random(500)
+                end
+                self.l:log("Rolled a " .. roll .. " to short out power lines")
+                if roll < 100 then
+                    local position = {x = powerLine.position.x + 0.5, y = powerLine.position.y + 0.5}
+                    local powerShort = powerLine.surface.create_entity({name = "power-short", position = position, force = powerLine.force})
+                    global.powerShorts[#global.powerShorts + 1] = {entity = powerShort, ticks_left = math.random(6, 25)}
+                end
+            end
+        end
+    end
+end
+
+function Map:updatePowerShorts()
+    if #global.powerShorts > 0 then
+        local valid = {}
+        for i = 1, #global.powerShorts do
+            local short = global.powerShorts[i]
+            if short ~= nil and short.entity ~= nil and short.entity.valid then
+                short.ticks_left = short.ticks_left - 1
+                if short.ticks_left > 1 then
+                    valid[#valid + 1] = short
+                else
+                    short.entity.destroy()
+                end
+            end
+        end
+        global.powerShorts = valid
+    end
+end
+
+-- removes any invalid lines
+function Map:updatePowerLines()
+    local valid = {}
+    for i = 1, #global.powerLineTargets do
+        if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
+            -- don't track lines older than 5 min
+            if math.abs(game.tick - global.powerLineTargets[i].age) < 18000 then
+                valid[#valid + 1] = global.powerLineTargets[i]
+            end
+        end
+    end
+    global.powerLineTargets = valid
 end
 
 function Map:iterateEnemyRegions()
-    -- check and update enemy regions every 5 s in non-peaceful, and every 30s in peaceful
-    local frequency = 30
+    -- check and update enemy regions every 2 s in non-peaceful, and every 30s in peaceful
+    -- increase update frequency if we have a lot of enemy regions to update
+    local frequency = math.max(2, math.floor(120 / global.enemyRegions.length))
     if global.expansion_state == "peaceful" then
         frequency = 30 * 60
     end
