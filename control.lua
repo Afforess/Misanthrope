@@ -161,11 +161,8 @@ function setExpansionState(expansion_state)
 
 	
 	-- allow biters to path from farther away (minor performance hit)
-	if expansion_state == "peaceful" then
-		game.map_settings.max_failed_behavior_count = 3
-	else
+	if expansion_state ~= "peaceful" then
 		game.map_settings.path_finder.max_steps_worked_per_tick = 500
-		game.map_settings.max_failed_behavior_count = 10
 	end
 	
 	if expansion_state == "peaceful" then
