@@ -148,6 +148,12 @@ function Map:checkPowerLinesForShorts()
                     local position = {x = powerLine.position.x + 0.5, y = powerLine.position.y + 0.5}
                     local powerShort = powerLine.surface.create_entity({name = "power-short", position = position, force = powerLine.force})
                     global.powerShorts[#global.powerShorts + 1] = {entity = powerShort, ticks_left = math.random(6, 25)}
+                    
+                    -- create a duplicate power line entity and explode it immediately for the animation
+                    local animation = powerLine.surface.create_entity({name = powerLine.name, position = powerLine.position, force = powerLine.force})
+                    if animation ~= nil then
+                        animation.die()
+                    end
                 end
             end
         end
