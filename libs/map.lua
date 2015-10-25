@@ -49,7 +49,7 @@ BITER_TARGETS["storage-tank"] = {value= 50}
 
 function Map:updateRegionAI(region, recursive)
     self.l:log("Updating biter AI for " .. region:tostring())
-    
+
     if not self:attackTargets(region) then
         self.l:log("No targets found!")
         if not recursive then
@@ -57,8 +57,6 @@ function Map:updateRegionAI(region, recursive)
             self:updateRegionAI(region:offset(0, -1), true)
             self:updateRegionAI(region:offset(1, 0), true)
             self:updateRegionAI(region:offset(-1, 0), true)
-            
-            self:updateRegionAI(Region.byRegionCoords({x = 13, y = -12 }), true)
         end
     end
 end
@@ -89,16 +87,23 @@ function Map:attackTargets(region)
     end
 end
 
--- number of turrets defending a particular location
+-- a value >= 0, 0 indicates no defenses, any positive value indicates stronger defenses, weighted by closeness of turrets defending a particular location
 function Map:getDefenseLevel(position)
+    local totalDefenses = 0
     local entityList = {}
     local turret_names = {"laser-turret", "gun-turret", "gun-turret-2"}
-    local area = {lefttop = {x = position.x - 13, y = position.y - 13}, rightbottom = {x = position.x + 13, y = position.y + 13}}
-    for i=1, #turret_names do
-        local temp = game.surfaces.nauvis.find_entities_filtered({area = area, name = turret_names[i]})
-        entityList = mergeTables(entityList, temp)
+    local turret_defense_value = {100000, 5000, 30000}
+    local area = {lefttop = {x = position.x - 25, y = position.y - 25}, rightbottom = {x = position.x + 25, y = position.y + 25}}
+    for i = 1, #turret_names do
+        local turret_entities = game.surfaces.nauvis.find_entities_filtered({area = area, name = turret_names[i]})
+        for j = 1, #turret_entities do
+            local turret = turret_entities[j]
+            local defense_value = turret_defense_value[i] * 100
+            local dist_squared = (position.x - turret.position.x) * (position.x - turret.position.x) + (position.y - turret.position.y) * (position.y - turret.position.y)
+            totalDefenses = totalDefenses + (defense_value / dist_squared)
+        end
     end
-    return #entityList
+    return totalDefenses
 end
 
 function Map:iterateEnemyRegions()
@@ -109,7 +114,7 @@ function Map:iterateEnemyRegions()
     end
 
 	if (game.tick % frequency == 0) then
-		local region = global.enemyRegions:pop_front()	
+		local region = global.enemyRegions:pop_front()
 		if region == nil then
 			self.l:log("No enemy regions found.")
 		else
@@ -120,11 +125,11 @@ function Map:iterateEnemyRegions()
 			else
 				-- add back to end of linked list
 				global.enemyRegions:push_back(region)
-                
-                --if global.expansion_state ~= "peaceful" then
+
+                if global.expansion_state ~= "peaceful" then
                     self:updateRegionAI(enemyRegion, false)
-                --end
-				
+                end
+
                 self.l:log(enemyRegion:tostring() .. " still has enemy spawners.")
 			end
 		end
@@ -132,20 +137,20 @@ function Map:iterateEnemyRegions()
 end
 
 function Map:iterateMap()
-	if (game.tick % 30 == 0) then		
+	if (game.tick % 30 == 0) then
 		local region = self:nextRegion()
-		
+
 		if not self:isEnemyRegion(region) and #region:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
 			global.enemyRegions:push_back({x = region:getX(), y = region:getY()})
 		end
-		
+
         self.l:log("Enemy Regions: " .. global.enemyRegions.length .. ". Queued regions: " .. #global.regionQueue .. ". Iterate region: " .. region:tostring() .. ". Enemy Spawners: " .. #region:findEntities({"biter-spawner", "spitter-spawner"}) .. ". Fully charted: ".. self.l:toString(region:isFullyCharted()) .. ". Partially charted: " .. self.l:toString(region:isPartiallyCharted()))
 	end
 end
 
 function Map:seedInitialQueue()
     self.l:log("Seeding initial region queue")
-	
+
 	-- reset lists
 	global.visitedRegions = {}
 	global.regionQueue = {}
@@ -163,12 +168,12 @@ function Map:nextRegion()
         self:seedInitialQueue()
 	end
 	local nextRegion = Region.byRegionCoords(table.remove(global.regionQueue, 1))
-	
+
 	self:addPartiallyCharted(nextRegion:offset(1, 0))
     self:addPartiallyCharted(nextRegion:offset(-1, 0))
     self:addPartiallyCharted(nextRegion:offset(0, 1))
     self:addPartiallyCharted(nextRegion:offset(0, -1))
-	
+
 	global.visitedRegions[#global.visitedRegions + 1] = {x = nextRegion:getX(), y = nextRegion:getY()}
 
 	return nextRegion
@@ -180,7 +185,7 @@ function Map:isAlreadyIterated(region)
 			return true
 		end
 	end
-	return false		
+	return false
 end
 
 function Map:isPendingIteration(region)
@@ -189,7 +194,7 @@ function Map:isPendingIteration(region)
 			return true
 		end
 	end
-	return false		
+	return false
 end
 
 function Map:isEnemyRegion(region)
@@ -198,7 +203,7 @@ function Map:isEnemyRegion(region)
 			return true
 		end
 	end
-	return false	
+	return false
 end
 
 function Map:addPartiallyCharted(region)

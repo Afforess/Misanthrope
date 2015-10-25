@@ -18,5 +18,5 @@ clean:
 install_mod:
 	if [ -L factorio_mods ] ; \
 	then \
-		cp build/$(NAME)_$(VERSION).zip factorio_mods/ ; \
+		cp -R build/$(NAME)_$(VERSION) factorio_mods ; \
 	fi;

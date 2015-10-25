@@ -32,12 +32,11 @@ Expansion States:
 -- 		265 / (265 + 85 + 65 + 55 + 45 + 35) or 48%. With 100% evolution factor, peaceful state chance is down to 34%.
 EXPANSION_STATES = {}
 EXPANSION_STATES["peaceful"] = { odds = 240, max_time = 15 * 60 * 60, min_time = 15 * 60 * 60, min_evo_factor = 0, evo_modifier = 1, attack_rate = 0, assault_chance = 0}
-EXPANSION_STATES["normal"] = { odds = 120, max_time = 15 * 60 * 60, min_time = 15 * 60 * 60, min_evo_factor = 0.15, evo_modifier = 1, attack_rate = 0, assault_chance = 0}
+EXPANSION_STATES["normal"] = { odds = 160, max_time = 15 * 60 * 60, min_time = 15 * 60 * 60, min_evo_factor = 0.15, evo_modifier = 1, attack_rate = 0, assault_chance = 0}
 EXPANSION_STATES["passive_expanding"] = {odds = 60, max_time = 2 * 60 * 60, min_time = 1 * 60 * 60, min_evo_factor = 0.25, evo_modifier = 0.9, attack_rate = 60, assault_chance = 0}
 EXPANSION_STATES["aggressive_expanding"] = {odds = 40, max_time = 3 * 60 * 60, min_time = 2 * 60 * 60, min_evo_factor = 0.35, evo_modifier = 0.85, attack_rate = 50, assault_chance = 0}
 EXPANSION_STATES["viral_expanding"] = {odds = 30, max_time = 5 * 60 * 60, min_time = 3 * 60 * 60, min_evo_factor = 0.50, evo_modifier = 0.80, attack_rate = 30, assault_chance = 10}
 EXPANSION_STATES["beachhead"] = {odds = 20, max_time = 8 * 60 * 60, min_time = 4 * 60 * 60, min_evo_factor = 0.65, evo_modifier = 0.75, attack_rate = 15, assault_chance = 50}
-EXPANSION_STATES["assault"] = {odds = 10, max_time = 10 * 60 * 60, min_time = 5 * 60 * 60, min_evo_factor = 0.75, evo_modifier = 0.70, attack_rate = 15, assault_chance = 100}
 
 local map = nil
 
@@ -69,33 +68,37 @@ end
 
 local function chooseExpansionState()
 	local total_odds = 0
-	l:log("Total expansion states: "..#EXPANSION_STATES)
+	l:log("Choosing a new expansion state. Previous State: " .. global.expansion_state)
 	l:log("Expansion states: "..l:toString(EXPANSION_STATES))
-	
+
 	for state,settings in pairs(EXPANSION_STATES) do
 		if game.evolution_factor >= settings.min_evo_factor then
-			local evo_odds = (settings.odds + math.floor(game.evolution_factor * 100))
+			-- add evolution factor * 100 (values are 0-100) to chance of expansion state, except peaceful.
+			local evo_odds = settings.odds
+			if state ~= "peaceful" then
+				evo_odds = (settings.odds + math.floor(game.evolution_factor * 100))
+			end
 			total_odds = total_odds + evo_odds
 			l:log("Odds of expansion state ["..state.."] are "..evo_odds)
 		end
 	end
 	l:log("Total odds for expansion states is "..total_odds)
-	
+
 	local expansion_chance = math.random(0, total_odds)
 	l:log("Rolled expansion chance of "..expansion_chance)
-	
+
 	local expansion_state = "peaceful"
 	for state,settings in pairs(EXPANSION_STATES) do
 		if game.evolution_factor >= settings.min_evo_factor then
 			local evo_odds = (settings.odds + math.floor(game.evolution_factor * 100))
 			if (expansion_chance < evo_odds) then
-				expansion_state = state 
+				expansion_state = state
 				break
 			end
 			expansion_chance = expansion_chance - evo_odds
 		end
 	end
-	
+
 	l:log("Chosen expansion state: "..l:toString(expansion_state))
 	l:dump()
 	setExpansionState(expansion_state)
@@ -122,7 +125,7 @@ script.on_event(defines.events.on_tick, function(event)
 	if global.expansion_state ~= "peaceful" then
 		if global.expansion_timer > 0 then
 			global.expansion_timer = global.expansion_timer - 1
-			
+
 			if game.evolution_factor < .001 then
 				game.evolution_factor = 0
 			else
@@ -145,26 +148,26 @@ function setExpansionState(expansion_state)
 	local assault_roll = math.random(0, 100)
 	global.assault = assault_roll < EXPANSION_STATES[expansion_state].assault_chance
 	l:log("Expansion assault roll: "..assault_roll..", assault_chance: "..EXPANSION_STATES[expansion_state].assault_chance)
-	
+
 	global.evo_factor = ((1 - EXPANSION_STATES[expansion_state].evo_modifier) * game.evolution_factor) / global.expansion_timer
 	l:log("Setting evo factor to: "..global.evo_factor)
-	
+
 	resetUnitGroup()
-	
+
 	-- cause pollution to spread farther
 	game.map_settings.pollution.diffusion_ratio = 0.04
 	game.map_settings.pollution.min_to_diffuse = 50
-	
+
 	-- penalize time more, and pollution a bit less (to compensate for the expanded spread)
 	game.map_settings.time_factor = 0.000004 * 4
 	game.map_settings.pollution_factor = 0.000015 / 2
 
-	
+
 	-- allow biters to path from farther away (minor performance hit)
 	if expansion_state ~= "peaceful" then
 		game.map_settings.path_finder.max_steps_worked_per_tick = 500
 	end
-	
+
 	if expansion_state == "peaceful" then
 		game.map_settings.enemy_expansion.enabled = false
 		global.expansion_timer = 0
@@ -172,7 +175,7 @@ function setExpansionState(expansion_state)
 
 	elseif expansion_state == "normal" then
 		game.map_settings.enemy_expansion.enabled = true
-		
+
 		-- vanilla map settings
 		game.map_settings.enemy_expansion.min_base_spacing = 3
 		game.map_settings.enemy_expansion.max_expansion_distance = 7
@@ -181,9 +184,9 @@ function setExpansionState(expansion_state)
 		game.map_settings.enemy_expansion.settler_group_max_size = 20
 		game.map_settings.enemy_expansion.min_expansion_cooldown = 5 * 3600
 		game.map_settings.enemy_expansion.max_expansion_cooldown = 60 * 3600
-		
+
 		game.map_settings.unit_group.max_member_speedup_when_behind = 1.4
-		
+
 	elseif expansion_state == "passive_expanding" then
 		game.map_settings.enemy_expansion.enabled = true
 		game.map_settings.enemy_expansion.min_base_spacing = 4
@@ -203,7 +206,7 @@ function setExpansionState(expansion_state)
 		game.map_settings.enemy_expansion.settler_group_max_size = 30
 		game.map_settings.enemy_expansion.min_expansion_cooldown = 5 * 60
 		game.map_settings.enemy_expansion.max_expansion_cooldown = 25 * 60
-		
+
 		game.map_settings.unit_group.max_member_speedup_when_behind = 2
 
 	elseif expansion_state == "viral_expanding" then
@@ -215,7 +218,7 @@ function setExpansionState(expansion_state)
 		game.map_settings.enemy_expansion.settler_group_max_size = 60
 		game.map_settings.enemy_expansion.min_expansion_cooldown = 5 * 60
 		game.map_settings.enemy_expansion.max_expansion_cooldown = 20 * 60
-		
+
 		game.map_settings.unit_group.max_group_radius = 60
 		game.map_settings.unit_group.max_member_speedup_when_behind = 3
 
@@ -228,12 +231,12 @@ function setExpansionState(expansion_state)
 		game.map_settings.enemy_expansion.settler_group_max_size = 75
 		game.map_settings.enemy_expansion.min_expansion_cooldown = 5 * 60
 		game.map_settings.enemy_expansion.max_expansion_cooldown = 20 * 60
-		
+
 		game.map_settings.unit_group.max_group_radius = 60
 		game.map_settings.unit_group.max_member_speedup_when_behind = 4
 	end
 	l:log("Enemy Expansion table: "..l:toString(game.map_settings.enemy_expansion))
-	
+
 	global.expansion_state = expansion_state
 	l:log("Expansion state set to: " .. global.expansion_state)
 	l:log("Timer is: " .. (global.expansion_timer / 60) .. " seconds")
@@ -244,7 +247,7 @@ end
 function resetUnitGroup()
 	game.map_settings.unit_group.min_group_gathering_time = 3600
 	game.map_settings.unit_group.max_group_gathering_time = 10 * 3600
-	
+
 	game.map_settings.unit_group.max_wait_time_for_late_members = 2 * 3600
 
 	game.map_settings.unit_group.max_group_radius = 30.0
