@@ -3,7 +3,7 @@ data:extend({
     {
     type = "radar",
     name = "power-short",
-    icon = "__base__/graphics/icons/small-lamp.png",
+    icon = "__Misanthrope__/graphics/shock.png",
     order="e-a-b",
     max_health = 0,
     corpse = "small-remnants",

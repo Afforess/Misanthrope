@@ -21,6 +21,12 @@ function MapClass.new(logger)
         global.powerShorts = {}
     end
     global.enemyRegions = linked_list()
+    -- migrate to linked list
+    if global.enemyRegionsArray then
+        for i = 0, #global.enemyRegionsArray do
+            global.enemyRegions.push_back(global.enemyRegionsArray[i])
+        end
+    end
     return self
 end
 
@@ -201,6 +207,13 @@ function Map:iterateEnemyRegions()
     end
 
 	if (game.tick % frequency == 0) then
+        -- keep a copy in an array because linked list does not deserialize correctly (TODO: fix)
+        global.enemyRegionsArray = {}
+        for v in global.enemyRegions:iterate() do
+            global.enemyRegionsArray[#global.enemyRegionsArray + 1] = v
+        end
+        
+        
 		local region = global.enemyRegions:pop_front()
 		if region == nil then
 			self.l:log("No enemy regions found.")
