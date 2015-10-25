@@ -117,47 +117,6 @@ script.on_event(defines.events.on_tick, function(event)
 		if game.tick % 60 == 0 and game.map_settings.path_finder.max_steps_worked_per_tick > 100 then
 			game.map_settings.path_finder.max_steps_worked_per_tick = game.map_settings.path_finder.max_steps_worked_per_tick - 1
 		end
-	else
-		local state = EXPANSION_STATES[global.expansion_state]
-		if not global.assault and state.attack_rate > 0 and game.tick % (state.attack_rate * 60) == 0 then
-			-- prod biters into attacking player / base
-			for i=1, #game.players do
-				if game.players[i].connected then
-					game.get_surface(1).build_enemy_base(game.players[i].position, 100)
-					l:log("Attempting to build biter base at player position of "..l:toString(game.players[i].position))
-				end
-			end
-		end
-		if global.assault and global.expansion_timer % 300 == 0 then
-			global.assault_group = {}
-			for i=1, #game.players do
-				if game.players[i].connected then
-					-- local enemies = game.get_surface(1).find_enemy_units(game.players[i].position, 750)
-					-- local nearest_spawner = findNearestEntity(game.players[i].position, {"biter-spawner", "spitter-spawner"})
-					-- if nearest_spawner ~= nil then
-					-- 	for j=1, #enemies do
-					-- 		enemies[j].set_command({type = defines.command.go_to_location, destination = nearest_spawner.position, radius = 60, distraction = defines.distraction.by_damage})
-					-- 		global.assault_group[#global.assault_group + 1] = { entity = enemies[j], position = game.players[i].position }
-					-- 	end
-					-- 	l:log("Attempting to form up assault group at "..l:toString(nearest_spawner.position))
-					-- end
-					
-					game.players[i].surface.set_multi_command({type = defines.command.attack, target = game.players[i].character, distraction = defines.distraction.by_enemy}, 100)
-				end
-			end
-		end
-		if global.assault and #global.assault_group > 0 and global.expansion_timer == 120 then
-			l:log("Starting assault")
-			for i=1, #global.assault_group do
-				assault_entity = global.assault_group[i].entity
-				if assault_entity ~= nil and assault_entity.valid then
-					assault_pos = global.assault_group[i].position
-					assault_entity.set_command({type = defines.command.attack_area, destination = assault_pos, radius = 15, distraction = defines.distraction.by_anything})
-				end
-			end
-			global.assault_group = {}
-			global.assault = false
-		end
 	end
 
 	if global.expansion_state ~= "peaceful" then
@@ -275,33 +234,7 @@ function setExpansionState(expansion_state)
 		
 		game.map_settings.unit_group.max_group_radius = 60
 		game.map_settings.unit_group.max_member_speedup_when_behind = 4
-
-	elseif expansion_state == "assault" then
-		game.map_settings.enemy_expansion.enabled = false
-		
-		game.map_settings.unit_group.max_group_radius = 100
-		game.map_settings.unit_group.max_member_speedup_when_behind = 6
-
 	end
-	-- 
-	-- global.assault_group = {}
-	-- if global.assault then
-	-- 	-- cause a total assault
-	-- 	for i=1, #game.players do
-	-- 		if game.players[i].connected then
-	-- 			local enemies = game.get_surface(1).find_enemy_units(game.players[i].position, 750)
-	-- 			local nearest_spawner = findNearestEntity(game.players[i].position, {"biter-spawner", "spitter-spawner"})
-	-- 			if nearest_spawner ~= nil then
-	-- 				for j=1, #enemies do
-	-- 					enemies[j].set_command({type = defines.command.go_to_location, destination = nearest_spawner.position, radius = 60, distraction = defines.distraction.by_damage})
-	-- 					global.assault_group[#global.assault_group + 1] = { entity = enemies[j], position = game.players[i].position }
-	-- 				end
-	-- 				l:log("Attempting to form up assault group at "..l:toString(nearest_spawner.position))
-	-- 			end
-	-- 		end
-	-- 	end
-	-- end
-
 	l:log("Enemy Expansion table: "..l:toString(game.map_settings.enemy_expansion))
 	
 	global.expansion_state = expansion_state
