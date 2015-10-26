@@ -21,12 +21,6 @@ function MapClass.new(logger)
         global.powerShorts = {}
     end
     global.enemyRegions = linked_list()
-    -- migrate to linked list
-    if global.enemyRegionsArray then
-        for i = 0, #global.enemyRegionsArray do
-            global.enemyRegions.push_back(global.enemyRegionsArray[i])
-        end
-    end
     return self
 end
 
@@ -199,21 +193,14 @@ function Map:updatePowerLines()
 end
 
 function Map:iterateEnemyRegions()
-    -- check and update enemy regions every 2 s in non-peaceful, and every 30s in peaceful
-    -- increase update frequency if we have a lot of enemy regions to update
-    local frequency = math.max(2, math.floor(120 / global.enemyRegions.length))
+    -- check and update enemy regions every 1 s in non-peaceful, and every 30s in peaceful
+    local frequency = 60
     if global.expansion_state == "peaceful" then
         frequency = 30 * 60
     end
 
 	if (game.tick % frequency == 0) then
-        -- keep a copy in an array because linked list does not deserialize correctly (TODO: fix)
-        global.enemyRegionsArray = {}
-        for v in global.enemyRegions:iterate() do
-            global.enemyRegionsArray[#global.enemyRegionsArray + 1] = v
-        end
-        
-        
+
 		local region = global.enemyRegions:pop_front()
 		if region == nil then
 			self.l:log("No enemy regions found.")
