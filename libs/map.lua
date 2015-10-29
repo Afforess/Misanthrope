@@ -30,10 +30,26 @@ function Map:tick()
     if game.tick % 3600 == 0 then
         self:updatePowerLines()
     end
+
+    if game.tick % (60 * 60 * 60) == 0 then
+        Region.cleanupGlobalData()
+    end
+
     if game.tick % 60 == 0 then
         self:checkPowerLinesForShorts()
     end
+
     self:updatePowerShorts()
+end
+
+function Map:profileFunction(function_handle, interval, msg)
+    if game.tick % interval == 0 then
+        local start_time = os.time()
+        function_handle(self)
+        self.l:log(msg .. os.difftime(os.time(), start_time))
+    else
+        function_handle(self)
+    end
 end
 
 BITER_TARGETS = {}
@@ -66,10 +82,10 @@ function Map:updateRegionAI(region, recursive)
     if not self:attackTargets(region) then
         self.l:log("No targets found!")
         if not recursive then
-            self:updateRegionAI(region:offset(0, 1), true)
-            self:updateRegionAI(region:offset(0, -1), true)
-            self:updateRegionAI(region:offset(1, 0), true)
-            self:updateRegionAI(region:offset(-1, 0), true)
+            --self:updateRegionAI(region:offset(0, 1), true)
+            --self:updateRegionAI(region:offset(0, -1), true)
+            --self:updateRegionAI(region:offset(1, 0), true)
+            --self:updateRegionAI(region:offset(-1, 0), true)
         end
     end
 end
@@ -104,14 +120,18 @@ function Map:attackTargets(region)
 end
 
 -- a value >= 0, 0 indicates no defenses, any positive value indicates stronger defenses, weighted by closeness of turrets defending a particular location
-function Map:getDefenseLevel(position)
+function Map:getDefenseLevel(region, position)
     local totalDefenses = 0
     local entityList = {}
     local turret_names = {"laser-turret", "gun-turret", "gun-turret-2"}
     local turret_defense_value = {500000, 10000, 60000}
     local area = {lefttop = {x = position.x - 25, y = position.y - 25}, rightbottom = {x = position.x + 25, y = position.y + 25}}
+    local surface = game.surfaces.nauvis
+    
+    -- TODO: cache and use region data
+    
     for i = 1, #turret_names do
-        local turret_entities = game.surfaces.nauvis.find_entities_filtered({area = area, name = turret_names[i]})
+        local turret_entities = surface.find_entities_filtered({area = area, name = turret_names[i]})
         for j = 1, #turret_entities do
             local turret = turret_entities[j]
             local defense_value = turret_defense_value[i] * 100
@@ -144,7 +164,7 @@ function Map:checkPowerLinesForShorts()
                     roll = math.random(500)
                 end
                 self.l:log("Rolled a " .. roll .. " to short out power lines")
-                if roll < 100 then
+                if roll < 10 then
                     local position = {x = powerLine.position.x + 0.5, y = powerLine.position.y + 0.5}
                     local powerShort = powerLine.surface.create_entity({name = "power-short", position = position, force = powerLine.force})
                     global.powerShorts[#global.powerShorts + 1] = {entity = powerShort, ticks_left = math.random(6, 25)}
@@ -214,7 +234,9 @@ function Map:iterateEnemyRegions()
 				global.enemyRegions:push_back(region)
 
                 if global.expansion_state ~= "peaceful" then
+                    local start_time = os.time()
                     self:updateRegionAI(enemyRegion, false)
+                    self.l:log("Time to update region AI: " .. os.difftime(os.time(), start_time))
                 end
 
                 self.l:log(enemyRegion:tostring() .. " still has enemy spawners.")

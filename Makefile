@@ -1,4 +1,4 @@
-VERSION := 0.0.2
+VERSION := 0.0.3
 NAME := Misanthrope
 
 all: clean build install_mod

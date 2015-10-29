@@ -8,6 +8,7 @@ Region.__index = Region
 REGION_SIZE = 4
 CHUNK_SIZE = 32
 MAX_UINT = 4294967296
+region_data = {}
 
 function Region:getX()
     return self.x
@@ -74,10 +75,14 @@ end
 function Region:isFullyCharted()
     local chunkX = self:getChunkX()
     local chunkY = self:getChunkY()
-    for dx = 0, REGION_SIZE do
-        for dy = 0, REGION_SIZE do
-            if not game.forces.player.is_chunk_charted(game.surfaces.nauvis, {chunkX + dx, chunkY + dy}) then
-                return false
+    local player_force = game.forces.player
+    
+    for _, surface in pairs(game.surfaces)
+        for dx = 0, REGION_SIZE do
+            for dy = 0, REGION_SIZE do
+                if not player_force.is_chunk_charted(surface, {chunkX + dx, chunkY + dy}) then
+                    return false
+                end
             end
         end
     end
@@ -87,10 +92,14 @@ end
 function Region:isPartiallyCharted()
     local chunkX = self:getChunkX()
     local chunkY = self:getChunkY()
-    for dx = 0, REGION_SIZE do
-        for dy = 0, REGION_SIZE do
-            if game.forces.player.is_chunk_charted(game.surfaces.nauvis, {chunkX + dx, chunkY + dy}) then
-                return true
+    local player_force = game.forces.player
+    
+    for _, surface in pairs(game.surfaces)
+        for dx = 0, REGION_SIZE do
+            for dy = 0, REGION_SIZE do
+                if player_force.is_chunk_charted(surface, {chunkX + dx, chunkY + dy}) then
+                    return true
+                end
             end
         end
     end
@@ -99,8 +108,10 @@ end
 
 function Region:findEntities(nameList)
     local entityList = {}
+    local surface = game.surfaces.nauvis
+    local region_area = self:regionArea()
     for i=1, #nameList do
-        local temp = game.surfaces.nauvis.find_entities_filtered({area = self:regionArea(), name = nameList[i]})
+        local temp = surface.find_entities_filtered({area = region_area, name = nameList[i]})
         entityList = mergeTables(entityList, temp)
     end
     return entityList
@@ -112,6 +123,57 @@ end
 
 function Region:offset(dx, dy)
     return RegionClass.byRegionCoords({x = self.x + dx, y = self.y + dy})
+end
+
+function Region:storeData(key, data)
+    if not region_data[self.x] then
+        region_data[self.x] = {}
+    end
+    if not region_data[self.x][self.y] then
+        region_data[self.x][self.y] = {}
+    end
+    region_data[self.x][self.y][key] = { key = key, value = data, tick_stored = game.tick}
+end
+
+function Region:getData(key, expiration_time)
+    if not region_data[self.x] or not region_data[self.x][self.y] then
+        return nil
+    end
+
+    expiration_time = expiration_time or -1
+    local data = region_data[self.x][self.y][key]
+    if data == nil then
+        return nil
+    end
+    if expiration_time == -1 or (game.tick - data.tick_stored) < expiration_time then
+        return data.value
+    end
+    return nil
+end
+
+function Region.cleanupGlobalData()
+    local tick = game.tick
+    local hour = 60 * 60 * 60
+    
+    recent_data = {}
+    for x, x_data in pairs(region_data) do
+        for y, y_data in pairs(x_data) do
+            for key, data in pairs(y_data) do
+                if tick - data.tick_stored < hour then
+                    if not recent_data[x] then
+                        recent_data[x] = {}
+                    end
+                    if not recent_data[x][y] then
+                        recent_data[x][y] = {}
+                    end
+                    
+                    recent_data[x][y][key] = data
+                end
+            end
+        end
+    end
+    
+    region_data = recent_data
 end
 
 -- create region from factorio position

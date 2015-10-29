@@ -4,6 +4,9 @@ local _M = {}
 local Logger = {prefix='misanthrope'}
 Logger.__index = Logger
 
+ -- tracks if the log file has ever been written to, for append vs replace in write_file
+local ever_written = false
+
 function Logger:log(str)
     local run_time_s = math.floor(game.tick/60)
     local run_time_minutes = math.floor(run_time_s/60)
@@ -14,7 +17,7 @@ function Logger:log(str)
 end
 
 function Logger:checkOutput()
-    if self.last_write_size ~= #self.log_buffer and (game.tick - self.last_write_tick) > 36 then
+    if self.last_write_size ~= #self.log_buffer and (game.tick - self.last_write_tick) > 60 then
         self:dump()
     end
 end
@@ -23,7 +26,9 @@ function Logger:dump()
     self.last_write_tick = game.tick
     self.last_write_size = #self.log_buffer
     local file_name = "logs/"..self.prefix.."/"..self.name..".log"
-    game.write_file(file_name, table.concat(self.log_buffer))
+    game.write_file(file_name, table.concat(self.log_buffer), ever_written)
+    self.log_buffer = []
+    ever_written = true
     return true
 end
 
