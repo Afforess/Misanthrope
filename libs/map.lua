@@ -1,6 +1,6 @@
 require "defines"
-local linked_list = require("libs/linked_list")
-local Region = require 'libs/region'
+local linked_list = require "libs/linked_list"
+local Region = require "libs/region"
 
 local MapClass = {}
 local Map = {}
@@ -31,25 +31,11 @@ function Map:tick()
         self:updatePowerLines()
     end
 
-    if game.tick % (60 * 60 * 60) == 0 then
-        Region.cleanupGlobalData()
-    end
-
     if game.tick % 60 == 0 then
         self:checkPowerLinesForShorts()
     end
 
     self:updatePowerShorts()
-end
-
-function Map:profileFunction(function_handle, interval, msg)
-    if game.tick % interval == 0 then
-        local start_time = os.time()
-        function_handle(self)
-        self.l:log(msg .. os.difftime(os.time(), start_time))
-    else
-        function_handle(self)
-    end
 end
 
 BITER_TARGETS = {}
@@ -96,8 +82,13 @@ function Map:attackTargets(region)
     for entity_name, target_data in pairs(BITER_TARGETS) do
         local targets = region:findEntities({entity_name})
         for i = 1, #targets do
+            if region:getDangerCache():calculatedAt() == -1 then
+                region:getDangerCache():calculate()
+                --self.l:log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
+            end
+            
             local value = target_data.value
-            local defenses = self:getDefenseLevel(targets[i].position)
+            local defenses = region:getDangerCache():getDanger(targets[i].position)
             value = value / (1 + defenses)
             self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. ". Base value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
             if value > highest_value then
@@ -111,7 +102,7 @@ function Map:attackTargets(region)
             self:trackPowerLine(highest_value_entity)
         end
         self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
-        highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.floor(highest_value) + 1, unit_search_distance = 256})
+        highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(10, 200) + 1, unit_search_distance = 256})
         return true
     else
         self.l:log("No valuable targets.")
@@ -234,9 +225,7 @@ function Map:iterateEnemyRegions()
 				global.enemyRegions:push_back(region)
 
                 if global.expansion_state ~= "peaceful" then
-                    local start_time = os.time()
                     self:updateRegionAI(enemyRegion, false)
-                    self.l:log("Time to update region AI: " .. os.difftime(os.time(), start_time))
                 end
 
                 self.l:log(enemyRegion:tostring() .. " still has enemy spawners.")

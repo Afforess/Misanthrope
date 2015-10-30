@@ -1,4 +1,5 @@
 require "defines"
+local DangerCache = require "libs/region/DangerCache"
 
 --region is a 4x4 area of chunks
 local RegionClass = {}
@@ -8,7 +9,6 @@ Region.__index = Region
 REGION_SIZE = 4
 CHUNK_SIZE = 32
 MAX_UINT = 4294967296
-region_data = {}
 
 function Region:getX()
     return self.x
@@ -77,7 +77,7 @@ function Region:isFullyCharted()
     local chunkY = self:getChunkY()
     local player_force = game.forces.player
     
-    for _, surface in pairs(game.surfaces)
+    for _, surface in pairs(game.surfaces) do
         for dx = 0, REGION_SIZE do
             for dy = 0, REGION_SIZE do
                 if not player_force.is_chunk_charted(surface, {chunkX + dx, chunkY + dy}) then
@@ -94,7 +94,7 @@ function Region:isPartiallyCharted()
     local chunkY = self:getChunkY()
     local player_force = game.forces.player
     
-    for _, surface in pairs(game.surfaces)
+    for _, surface in pairs(game.surfaces) do
         for dx = 0, REGION_SIZE do
             for dy = 0, REGION_SIZE do
                 if player_force.is_chunk_charted(surface, {chunkX + dx, chunkY + dy}) then
@@ -125,55 +125,8 @@ function Region:offset(dx, dy)
     return RegionClass.byRegionCoords({x = self.x + dx, y = self.y + dy})
 end
 
-function Region:storeData(key, data)
-    if not region_data[self.x] then
-        region_data[self.x] = {}
-    end
-    if not region_data[self.x][self.y] then
-        region_data[self.x][self.y] = {}
-    end
-    region_data[self.x][self.y][key] = { key = key, value = data, tick_stored = game.tick}
-end
-
-function Region:getData(key, expiration_time)
-    if not region_data[self.x] or not region_data[self.x][self.y] then
-        return nil
-    end
-
-    expiration_time = expiration_time or -1
-    local data = region_data[self.x][self.y][key]
-    if data == nil then
-        return nil
-    end
-    if expiration_time == -1 or (game.tick - data.tick_stored) < expiration_time then
-        return data.value
-    end
-    return nil
-end
-
-function Region.cleanupGlobalData()
-    local tick = game.tick
-    local hour = 60 * 60 * 60
-    
-    recent_data = {}
-    for x, x_data in pairs(region_data) do
-        for y, y_data in pairs(x_data) do
-            for key, data in pairs(y_data) do
-                if tick - data.tick_stored < hour then
-                    if not recent_data[x] then
-                        recent_data[x] = {}
-                    end
-                    if not recent_data[x][y] then
-                        recent_data[x][y] = {}
-                    end
-                    
-                    recent_data[x][y][key] = data
-                end
-            end
-        end
-    end
-    
-    region_data = recent_data
+function Region:getDangerCache()
+    return self.danger_cache
 end
 
 -- create region from factorio position
@@ -188,6 +141,8 @@ function RegionClass.new(pos)
     if (pos.y < 0) then
         self.y = self.y - MAX_UINT
     end
+    self.danger_cache = DangerCache.new(self)
+    
     return self
 end
 
@@ -196,6 +151,8 @@ function RegionClass.byRegionCoords(regionCoords)
     local self = setmetatable({}, Region)
     self.x = math.floor(regionCoords.x)
     self.y = math.floor(regionCoords.y)
+    self.danger_cache = DangerCache.new(self)
+
     return self
 end
 return RegionClass

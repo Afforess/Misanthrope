@@ -27,7 +27,7 @@ function Logger:dump()
     self.last_write_size = #self.log_buffer
     local file_name = "logs/"..self.prefix.."/"..self.name..".log"
     game.write_file(file_name, table.concat(self.log_buffer), ever_written)
-    self.log_buffer = []
+    self.log_buffer = {}
     ever_written = true
     return true
 end
