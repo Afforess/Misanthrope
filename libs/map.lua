@@ -82,7 +82,7 @@ function Map:attackTargets(region)
     for entity_name, target_data in pairs(BITER_TARGETS) do
         local targets = region:findEntities({entity_name})
         for i = 1, #targets do
-            if region:getDangerCache():calculatedAt() == -1 then
+            if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 10) then
                 region:getDangerCache():calculate()
                 --self.l:log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
             end
