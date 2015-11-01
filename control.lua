@@ -1,5 +1,7 @@
 require "defines"
 require "util"
+require 'libs/EvoGUI'
+
 local linked_list = require("libs/linked_list")
 local Region = require 'libs/region'
 local Map = require 'libs/map'
@@ -31,12 +33,64 @@ Expansion States:
 -- This skews any random state towards some aggressive one. Example with 25% evolution factor:
 -- 		265 / (265 + 85 + 65 + 55 + 45 + 35) or 48%. With 100% evolution factor, peaceful state chance is down to 34%.
 EXPANSION_STATES = {}
-EXPANSION_STATES["peaceful"] = { odds = 240, max_time = 15 * 60 * 60, min_time = 15 * 60 * 60, min_evo_factor = 0, evo_modifier = 1, attack_rate = 0, assault_chance = 0}
-EXPANSION_STATES["normal"] = { odds = 160, max_time = 15 * 60 * 60, min_time = 15 * 60 * 60, min_evo_factor = 0.15, evo_modifier = 1, attack_rate = 0, assault_chance = 0}
-EXPANSION_STATES["passive_expanding"] = {odds = 60, max_time = 2 * 60 * 60, min_time = 1 * 60 * 60, min_evo_factor = 0.25, evo_modifier = 0.9, attack_rate = 60, assault_chance = 0}
-EXPANSION_STATES["aggressive_expanding"] = {odds = 40, max_time = 3 * 60 * 60, min_time = 2 * 60 * 60, min_evo_factor = 0.35, evo_modifier = 0.85, attack_rate = 50, assault_chance = 0}
-EXPANSION_STATES["viral_expanding"] = {odds = 30, max_time = 5 * 60 * 60, min_time = 3 * 60 * 60, min_evo_factor = 0.50, evo_modifier = 0.80, attack_rate = 30, assault_chance = 10}
-EXPANSION_STATES["beachhead"] = {odds = 20, max_time = 8 * 60 * 60, min_time = 4 * 60 * 60, min_evo_factor = 0.65, evo_modifier = 0.75, attack_rate = 15, assault_chance = 50}
+EXPANSION_STATES["peaceful"] = { name = "Peaceful",
+								 color = { r = 0, g = 255, b = 10 },
+								 odds = 240, 
+								 max_time = 15 * 60 * 60, 
+								 min_time = 15 * 60 * 60, 
+								 min_evo_factor = 0, 
+								 evo_modifier = 1, 
+								 attack_rate = 0, 
+								 assault_chance = 0 }
+								 
+EXPANSION_STATES["normal"] = { name = "Normal",
+							   color = { r = 255, g = 255, b = 255 },
+							   odds = 160, 
+							   max_time = 15 * 60 * 60, 
+							   min_time = 15 * 60 * 60, 
+							   min_evo_factor = 0.15, 
+							   evo_modifier = 1, 
+							   attack_rate = 0, 
+							   assault_chance = 0 }
+							   
+EXPANSION_STATES["passive_expanding"] = { name = "Passive Expansion",
+										  color = { r = 255, g = 255, b = 0 },
+ 										  odds = 60,
+										  max_time = 2 * 60 * 60,
+										  min_time = 1 * 60 * 60, 
+										  min_evo_factor = 0.25, 
+										  evo_modifier = 0.9, 
+										  attack_rate = 60, 
+										  assault_chance = 0 }
+										  
+EXPANSION_STATES["aggressive_expanding"] = { name = "Aggressive Expansion", 
+											 color = { r = 255, g = 155, b = 0 },
+											 odds = 40, 
+											 max_time = 3 * 60 * 60, 
+											 min_time = 2 * 60 * 60, 
+											 min_evo_factor = 0.35, 
+											 evo_modifier = 0.85, 
+											 attack_rate = 50, 
+											 assault_chance = 0 }
+											 
+EXPANSION_STATES["viral_expanding"] = { name = "Viral Expansion",
+										color = { r = 255, g = 50, b = 0 },
+										odds = 30, 
+										max_time = 5 * 60 * 60, 
+										min_time = 3 * 60 * 60, 
+										min_evo_factor = 0.50, 
+										evo_modifier = 0.80, 
+										attack_rate = 30, 
+										assault_chance = 10 }
+EXPANSION_STATES["beachhead"] = { name = "Assault", 
+								  color = { r = 255, g = 0, b = 0 },
+								  odds = 20, 
+								  max_time = 8 * 60 * 60,
+								  min_time = 4 * 60 * 60, 
+								  min_evo_factor = 0.65, 
+								  evo_modifier = 0.75, 
+								  attack_rate = 15, 
+								  assault_chance = 50}
 
 local map = nil
 
@@ -107,6 +161,11 @@ end
 script.on_event(defines.events.on_tick, function(event)
 	setup()
 	map:tick()
+	
+	init_EvoGUI()
+	if game.tick % 60 == 0 then
+		updateEvoGUI()
+	end
 
 	if global.expansion_state == "peaceful" then
 		-- recalculate expansion phase every 15 min
