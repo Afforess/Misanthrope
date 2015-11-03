@@ -93,6 +93,7 @@ EXPANSION_STATES["beachhead"] = { name = "Assault",
 								  assault_chance = 50}
 
 local map = nil
+local evo_gui = nil
 
 script.on_init(setup)
 local function setup()
@@ -161,11 +162,10 @@ end
 script.on_event(defines.events.on_tick, function(event)
 	setup()
 	map:tick()
-	
-	init_EvoGUI()
-	if game.tick % 60 == 0 then
-		updateEvoGUI()
+	if not evo_gui then
+		evo_gui = EvoGUI.new()
 	end
+	evo_gui:tick()
 
 	if global.expansion_state == "peaceful" then
 		-- recalculate expansion phase every 15 min
