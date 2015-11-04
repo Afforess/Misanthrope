@@ -7,8 +7,8 @@ function EvoGUI.new()
     if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
         EvoGUI.detected = true
 
-        remote.call("EvoGUI", "create_remote_sensor", "evolution_state", "Evolution State:", "[Misanthrope] Evolution State")
-        remote.call("EvoGUI", "create_remote_sensor", "evolution_rate", "Evolution Rate:", "[Misanthrope] Evolution Rate")
+        remote.call("EvoGUI", "create_remote_sensor", "Misanthrope", "evolution_state", "Evolution State:", "[Misanthrope] Evolution State")
+        remote.call("EvoGUI", "create_remote_sensor", "Misanthrope", "evolution_rate", "Evolution Rate:", "[Misanthrope] Evolution Rate")
     end
 
     function EvoGUI:createEvolutionRateText()
