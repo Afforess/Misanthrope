@@ -185,7 +185,7 @@ function Map.new(logger)
 
     function Map:iterateEnemyRegions()
         -- check and update enemy regions every 1 s in non-peaceful, and every 30s in peaceful
-        local frequency = 30
+        local frequency = 60
         if global.expansion_state == "peaceful" then
             frequency = 30 * 60
         end
