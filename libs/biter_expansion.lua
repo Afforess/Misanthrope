@@ -23,6 +23,11 @@ function BiterExpansion.new(logger)
 	end
 
     function self:tick()
+        if global.expansion_phase_request ~= nil then
+            self:set_expansion_state(self.expansion[global.expansion_phase_request.index])
+            global.expansion_phase_request = nil
+        end
+
         if global.expansion_timer > 0 then
             global.expansion_timer = global.expansion_timer - 1
 

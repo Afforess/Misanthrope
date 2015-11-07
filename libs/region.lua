@@ -129,6 +129,37 @@ function Region:getDangerCache()
     return self.danger_cache
 end
 
+function Region:mark_attack_position(pos, logger)
+    logger:log("mark_attack_position")
+
+    x = math.floor(pos.x)
+    y = math.floor(pos.y)
+    found = false
+    for i = 1, #self.attacked_positions do
+        if self.attacked_positions[i].x == x and self.attacked_positions[i].y == y then
+            self.attacked_positions[i].count = self.attacked_positions[i].count + 1
+            found = true
+            logger:log("Found position " .. logger:toString(self.attacked_positions[i]) .. " with count of " .. self.attacked_positions[i].count)
+            break
+        end
+    end
+    if not found then
+        logger:log("Adding position " .. logger:toString( { x = x, y = y, count = 1 } ))
+        table.insert(self.attacked_positions, { x = x, y = y, count = 1 })
+    end
+end
+
+function Region:get_count_attack_on_position(pos)
+    x = math.floor(pos.x)
+    y = math.floor(pos.y)
+    for i = 1, #self.attacked_positions do
+        if self.attacked_positions[i].x == x and self.attacked_positions[i].y == y then
+            return self.attacked_positions[i].count
+        end
+    end
+    return 0
+end
+
 -- create region from factorio position
 function RegionClass.new(pos)
     local self = setmetatable({}, Region)
@@ -142,6 +173,7 @@ function RegionClass.new(pos)
         self.y = self.y - MAX_UINT
     end
     self.danger_cache = DangerCache.new(self)
+    self.attacked_positions = {}
     
     return self
 end
@@ -152,6 +184,7 @@ function RegionClass.byRegionCoords(regionCoords)
     self.x = math.floor(regionCoords.x)
     self.y = math.floor(regionCoords.y)
     self.danger_cache = DangerCache.new(self)
+    self.attacked_positions = {}
 
     return self
 end

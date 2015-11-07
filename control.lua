@@ -1,5 +1,6 @@
 require "defines"
 require "util"
+require 'remote'
 require 'libs/EvoGUI'
 require 'libs/map'
 require 'libs/biter_expansion'

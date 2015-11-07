@@ -84,10 +84,12 @@ function Map.new(logger)
                     --self.l:log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
                 end
                 
-                local value = target_data.value
+                local value = target_data.value * 10000
                 local defenses = region:getDangerCache():getDanger(targets[i].position)
+                local attack_count = region:get_count_attack_on_position(targets[i].position)
                 value = value / (1 + defenses)
-                self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. ". Base value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                value = value / (1 + attack_count)
+                self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. ". Base value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
                 if value > highest_value then
                     highest_value = value
                     highest_value_entity = targets[i]
@@ -98,8 +100,12 @@ function Map.new(logger)
             if highest_value_entity.type == "electric-pole" then
                 self:trackPowerLine(highest_value_entity)
             end
+            self.l:log("Region attacked_positions: " .. self.l:toString(region.attacked_positions))
             self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
             highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(10, 200) + 1, unit_search_distance = 256})
+            region:mark_attack_position(highest_value_entity.position, self.l)
+            region:mark_attack_position(highest_value_entity.position, self.l)
+
             return true
         else
             self.l:log("No valuable targets.")
@@ -179,24 +185,22 @@ function Map.new(logger)
 
     function Map:iterateEnemyRegions()
         -- check and update enemy regions every 1 s in non-peaceful, and every 30s in peaceful
-        local frequency = 60
+        local frequency = 30
         if global.expansion_state == "peaceful" then
             frequency = 30 * 60
         end
 
     	if (game.tick % frequency == 0) then
-
-    		local region = global.enemyRegions:pop_front()
-    		if region == nil then
+    		local enemyRegion = global.enemyRegions:pop_front()
+    		if enemyRegion == nil then
     			self.l:log("No enemy regions found.")
     		else
-    			local enemyRegion = Region.byRegionCoords(region)
     			if #enemyRegion:findEntities({"biter-spawner", "spitter-spawner"}) == 0 then
     				-- enemy spawners have been destroyed
                     self.l:log(enemyRegion:tostring() .. " no longer has enemy spawners. Removing from list of enemy regions.")
     			else
     				-- add back to end of linked list
-    				global.enemyRegions:push_back(region)
+    				global.enemyRegions:push_back(enemyRegion)
 
                     if global.expansion_state ~= "Peaceful" then
                         self:updateRegionAI(enemyRegion, false)
@@ -213,7 +217,7 @@ function Map.new(logger)
     		local region = self:nextRegion()
 
     		if not self:isEnemyRegion(region) and #region:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
-    			global.enemyRegions:push_back({x = region:getX(), y = region:getY()})
+    			global.enemyRegions:push_back(region)
     		end
 
             self.l:log("Enemy Regions: " .. global.enemyRegions.length .. ". Queued regions: " .. #global.regionQueue .. ". Iterate region: " .. region:tostring() .. ". Enemy Spawners: " .. #region:findEntities({"biter-spawner", "spitter-spawner"}) .. ". Fully charted: ".. self.l:toString(region:isFullyCharted()) .. ". Partially charted: " .. self.l:toString(region:isPartiallyCharted()))
@@ -270,8 +274,8 @@ function Map.new(logger)
     end
 
     function Map:isEnemyRegion(region)
-    	for regionCoords in global.enemyRegions:iterate() do
-    		if (regionCoords.x == region:getX() and regionCoords.y == region:getY()) then
+    	for enemyRegion in global.enemyRegions:iterate() do
+    		if (enemyRegion:getX() == region:getX() and enemyRegion:getY() == region:getY()) then
     			return true
     		end
     	end
