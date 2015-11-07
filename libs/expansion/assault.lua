@@ -3,7 +3,7 @@ local expansion = { name = "Assault",
 				    color = { r = 255, g = 50, b = 0 },
 					max_time = 5 * 60 * 60, 
 					min_time = 3 * 60 * 60, 
-					min_evo_factor = 0.50, 
+					min_evo_factor = 0.70, 
 					evo_modifier = 0.85 }
 
 function expansion:update_expansion_state()
