@@ -1,14 +1,24 @@
 
 EvoGUI = {}
 
-function EvoGUI.new()
-    local EvoGUI = { detected = false, exponential_moving_average = game.evolution_factor }
+function EvoGUI.new(expansion_phases)
+    local EvoGUI = { expansion_phases = expansion_phases, detected = false, exponential_moving_average = game.evolution_factor }
 
     if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
         EvoGUI.detected = true
 
-        remote.call("EvoGUI", "create_remote_sensor", "Misanthrope", "evolution_state", "Evolution State:", "[Misanthrope] Evolution State")
-        remote.call("EvoGUI", "create_remote_sensor", "Misanthrope", "evolution_rate", "Evolution Rate:", "[Misanthrope] Evolution Rate")
+        remote.call("EvoGUI", "create_remote_sensor", {
+            mod_name = "Misanthrope",
+            name = "evolution_state",
+            text = "Evolution State:",
+            caption = "Evolution State"
+        })
+        remote.call("EvoGUI", "create_remote_sensor", {
+            mod_name = "Misanthrope",
+            name = "evolution_rate",
+            text = "Evolution Rate:",
+            caption = "Evolution Rate"
+        })
     end
 
     function EvoGUI:createEvolutionRateText()
@@ -32,15 +42,9 @@ function EvoGUI.new()
     end
 
     function EvoGUI:createEvolutionText()
-        local expansion_data = EXPANSION_STATES[global.expansion_state]
+        local expansion_data = self.expansion_phases[global.expansion_index]
         local text = "Evolution State: " .. expansion_data.name
-        if global.expansion_state == "peaceful" then
-            local ticks_left = (15 * 60 * 60) - (game.tick - global.end_of_last_expansion)
-
-            text = text .. " ( " .. math.floor(ticks_left / 60) .. "s )"
-        else
-            text = text .. " ( " .. math.floor(global.expansion_timer / 60) .. "s )"
-        end
+        text = text .. " ( " .. math.floor(global.expansion_timer / 60) .. "s )"
         return text
     end
 
@@ -52,7 +56,7 @@ function EvoGUI.new()
     end
     
     function EvoGUI:updateGUI()
-        local expansion_data = EXPANSION_STATES[global.expansion_state]
+        local expansion_data = self.expansion_phases[global.expansion_index]
 
         remote.call("EvoGUI", "update_remote_sensor", "evolution_state", self:createEvolutionText(), expansion_data.color)
         remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", self:createEvolutionRateText(), self:calculateEvolutionRateColor())

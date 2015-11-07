@@ -1,6 +1,6 @@
 {
   "name": "Misanthrope",
-  "version": "@VERSION@",
+  "version": "{{VERSION}}",
   "title": "Misanthrope",
   "author": "Afforess",
   "contact": "afforess@gmail.com",
