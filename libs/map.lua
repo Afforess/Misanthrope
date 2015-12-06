@@ -17,9 +17,12 @@ function Map.new(logger)
     if not global.powerShorts then
         global.powerShorts = {}
     end
-    global.enemyRegions = linked_list()
+    if not global.powerShorts then
+        global.powerShorts = {}
+    end
+    global.enemyRegions = nil
 
-    local Map = { l = logger }
+    local Map = { l = logger, enemyRegions = linked_list(), emitterRegions = linked_list()}
 
     function Map:tick()
         self:iterateMap()
@@ -58,6 +61,21 @@ function Map.new(logger)
 
     BITER_TARGETS["offshore-pump"] = {value= 150}
     BITER_TARGETS["storage-tank"] = {value= 50}
+
+    function Map:scanForEmitters()
+        
+    end
+    
+    function Map:getAllRegions(surface)
+        for chunk in surface.get_chunks() do
+            
+            for region in self.emitterRegions:iterate() do
+                
+            end
+        end
+    end
+    
+    function Map:
 
     function Map:updateRegionAI(region, recursive)
         self.l:log("Updating biter AI for " .. region:tostring())
@@ -191,7 +209,7 @@ function Map.new(logger)
         end
 
     	if (game.tick % frequency == 0) then
-    		local enemyRegion = global.enemyRegions:pop_front()
+    		local enemyRegion = self.enemyRegions:pop_front()
     		if enemyRegion == nil then
     			self.l:log("No enemy regions found.")
     		else
@@ -200,7 +218,7 @@ function Map.new(logger)
                     self.l:log(enemyRegion:tostring() .. " no longer has enemy spawners. Removing from list of enemy regions.")
     			else
     				-- add back to end of linked list
-    				global.enemyRegions:push_back(enemyRegion)
+    				self.enemyRegions:push_back(enemyRegion)
 
                     if global.expansion_state ~= "Peaceful" then
                         self:updateRegionAI(enemyRegion, false)
@@ -217,10 +235,8 @@ function Map.new(logger)
     		local region = self:nextRegion()
 
     		if not self:isEnemyRegion(region) and #region:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
-    			global.enemyRegions:push_back(region)
+    			self.enemyRegions:push_back(region)
     		end
-
-            self.l:log("Enemy Regions: " .. global.enemyRegions.length .. ". Queued regions: " .. #global.regionQueue .. ". Iterate region: " .. region:tostring() .. ". Enemy Spawners: " .. #region:findEntities({"biter-spawner", "spitter-spawner"}) .. ". Fully charted: ".. self.l:toString(region:isFullyCharted()) .. ". Partially charted: " .. self.l:toString(region:isPartiallyCharted()))
     	end
     end
 
@@ -274,7 +290,7 @@ function Map.new(logger)
     end
 
     function Map:isEnemyRegion(region)
-    	for enemyRegion in global.enemyRegions:iterate() do
+    	for enemyRegion in self.enemyRegions:iterate() do
     		if (enemyRegion:getX() == region:getX() and enemyRegion:getY() == region:getY()) then
     			return true
     		end
