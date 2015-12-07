@@ -22,7 +22,7 @@ function Map.new(logger)
     end
     global.enemyRegions = nil
 
-    local Map = { l = logger, enemyRegions = linked_list(), emitterRegions = linked_list()}
+    local Map = { l = logger, enemyRegions = linked_list()}
 
     function Map:tick()
         self:iterateMap()
@@ -62,21 +62,6 @@ function Map.new(logger)
     BITER_TARGETS["offshore-pump"] = {value= 150}
     BITER_TARGETS["storage-tank"] = {value= 50}
 
-    function Map:scanForEmitters()
-        
-    end
-    
-    function Map:getAllRegions(surface)
-        for chunk in surface.get_chunks() do
-            
-            for region in self.emitterRegions:iterate() do
-                
-            end
-        end
-    end
-    
-    function Map:
-
     function Map:updateRegionAI(region, recursive)
         self.l:log("Updating biter AI for " .. region:tostring())
 
@@ -92,7 +77,8 @@ function Map.new(logger)
     end
 
     function Map:attackTargets(region)
-        local highest_value = 0
+        -- setting highest_value > 0 means don't attack if there are only targets with good defenses
+        local highest_value = 10000
         local highest_value_entity = nil
         for entity_name, target_data in pairs(BITER_TARGETS) do
             local targets = region:findEntities({entity_name})

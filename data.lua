@@ -2,6 +2,7 @@ require("prototypes.entity.power_short")
 require("prototypes.item.emitter")
 require("prototypes.entity.emitter")
 require("prototypes.recipes.emitter")
+require("prototypes.technology.alien_defense")
 
 data.raw["unit-spawner"]["biter-spawner"].pollution_absorbtion_absolute = 2
 data.raw["unit-spawner"]["biter-spawner"].pollution_absorbtion_proportional = 0.005

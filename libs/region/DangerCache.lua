@@ -35,8 +35,8 @@ function DangerCache:calculate()
     area.rightbottom.x = area.rightbottom.x + 25
     area.rightbottom.y = area.rightbottom.y + 25
     
-    local turret_names = {"laser-turret", "gun-turret", "gun-turret-2"}
-    local turret_defense_value = {2000, 100, 600}
+    local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
+    local turret_defense_value = {2000, 100, 600, 300}
     local turret_range = 35
     local surface = game.surfaces.nauvis
 

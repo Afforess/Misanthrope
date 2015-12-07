@@ -2,9 +2,17 @@ data:extend(
 {
     {
         type = "technology",
-        name = "biter-science",
-        icon = "__base__/graphics/technology/turrets.png",
+        name = "alien_defense",
+        icon = "__Misanthrope__/graphics/biohazard.png",
+        icon_size = 128,
         prerequisites = {"military-3", "turrets"},
+        effects =
+        {
+            {
+                type = "unlock-recipe",
+                recipe = "biter-emitter"
+            }
+        },
         unit =
         {
             count = 100,

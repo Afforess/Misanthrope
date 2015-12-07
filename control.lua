@@ -4,6 +4,7 @@ require 'remote'
 require 'libs/EvoGUI'
 require 'libs/map'
 require 'libs/biter_expansion'
+local Harpa = require "libs/harpa"
 
 local logger = require 'libs/logger'
 local l = logger.new_logger("main")
@@ -31,6 +32,15 @@ script.on_event(defines.events.on_tick, function(event)
 	map:tick()
 	biter_expansion:tick()
 	evo_gui:tick()
+	Harpa.tick(l)
+end)
+
+-- Strip backer names from HARPA emitters
+script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, function(event)
+	if event.created_entity.name == "biter-emitter" then
+		event.created_entity.backer_name = ""
+		Harpa.register(event.created_entity)
+	end
 end)
 
 function mergeTables(table1, table2)

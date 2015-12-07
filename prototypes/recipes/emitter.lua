@@ -3,7 +3,6 @@ data:extend(
     {
         type = "recipe",
         name = "biter-emitter",
-        enabled = true,
         energy_required = 8,
         ingredients =
         {

@@ -6,5 +6,5 @@
   "contact": "afforess@gmail.com",
   "homepage": "https://github.com/Afforess/Misanthrope",
   "description": "Alters biter expansion mechanics, adds vastly improved biter AI behavior",
-  "dependencies": ["base >= 0.12.11", "? EvoGUI"]
+  "dependencies": ["base >= 0.12.20", "? EvoGUI"]
 }
