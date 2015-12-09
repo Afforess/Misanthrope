@@ -2,18 +2,82 @@ require "defines"
 
 Harpa = {}
 
-function Harpa.register(entity)
+function Harpa.register(entity, player_idx)
     if not global.harpa_list then
         global.harpa_list = {}
     end
     if not global.biter_ignore_list then
         global.biter_ignore_list = {}
     end
+    if not global.harpa_overlays then
+        global.harpa_overlays = {}
+    end
+    if player_idx then
+        Harpa.create_overlay(entity, player_idx)
+    end
     table.insert(global.harpa_list, entity)
+end
+
+function Harpa.create_overlay(entity, player_idx)
+    -- only allow 1 active overlay per player (to prevent lag)
+    for i = #global.harpa_overlays, 1, -1 do
+        local overlay = global.harpa_overlays[i]
+        if overlay.player_idx == player_idx then
+            overlay.ticks_remaining = -1
+        end
+    end
+    local overlay_entity = entity.surface.create_entity({name = "80_red_overlay", force = game.forces.neutral, position = entity.position })
+    local overlay = { player_idx = player_idx, harpa = entity, entity_list = {}, radius = 0, ticks_remaining = 15 * 30 + 12 * 60 }
+    table.insert(overlay.entity_list, overlay_entity)
+    table.insert(global.harpa_overlays, overlay)
+end
+
+function Harpa.update_overlays()
+    if not global.harpa_overlays then
+        return
+    end
+    for i = #global.harpa_overlays, 1, -1 do
+        local overlay = global.harpa_overlays[i]
+        if overlay.radius < 30 and overlay.harpa.valid and overlay.ticks_remaining % 15 == 0 then
+            overlay.radius = overlay.radius + 1
+            if (overlay.radius % 5 == 0) then
+                local surface = overlay.harpa.surface
+                local opacity = 80 - overlay.radius * 2
+                local position = overlay.harpa.position
+                for dx = -(overlay.radius), overlay.radius do
+                    Harpa.create_overlay_entity(surface, opacity, {position.x + dx, position.y + overlay.radius}, overlay.entity_list)
+                    Harpa.create_overlay_entity(surface, opacity, {position.x + dx, position.y - overlay.radius}, overlay.entity_list)
+                end
+                for dy = -(overlay.radius - 1), overlay.radius - 1 do
+                    Harpa.create_overlay_entity(surface, opacity, {position.x + overlay.radius, position.y + dy}, overlay.entity_list)
+                    Harpa.create_overlay_entity(surface, opacity, {position.x - overlay.radius, position.y - dy}, overlay.entity_list)
+                end
+            end
+        end
+        overlay.ticks_remaining = overlay.ticks_remaining - 1
+        if overlay.ticks_remaining <= 0 or not overlay.harpa.valid then
+            table.remove(global.harpa_overlays, i)
+            for _, entity in ipairs(overlay.entity_list) do
+                if entity.valid then
+                    entity.destroy()
+                end
+            end
+        end
+    end
+end
+
+function Harpa.create_overlay_entity(surface, opacity, position, list)
+    local overlay_entity = surface.create_entity({name = opacity .. "_red_overlay", force = game.forces.neutral, position = position})
+    overlay_entity.minable = false
+    overlay_entity.destructible = false
+    overlay_entity.operable = false
+    table.insert(list, overlay_entity)
 end
 
 function Harpa.tick(logger)
     if global.harpa_list then
+        Harpa.update_overlays()
+        
         for i = #global.harpa_list, 1, -1 do
             local harpa = global.harpa_list[i]
             if not harpa.valid then

@@ -1,3 +1,32 @@
+function color_overlay(color_name, opacity)
+    return {
+        type = "container",
+        name = opacity .. "_" .. color_name .."_overlay",
+        flags = {"placeable-neutral", "player-creation", "not-repairable"},
+        icon = "__Misanthrope__/graphics/overlay/" .. opacity .. "_" .. color_name .. "_overlay.png",
+        max_health = 1,
+        order = 'z',
+        collision_mask = {"resource-layer"},
+        collision_box = {{-0.35, -0.35}, {0.35, 0.35}},
+        selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
+        inventory_size = 1,
+        picture =
+        {
+            filename = "__Misanthrope__/graphics/overlay/" .. opacity .. "_" .. color_name .. "_overlay.png",
+            priority = "extra-high",
+            width = 32,
+            height = 32,
+            shift = {0.0, 0.0}
+        }
+    }
+end
+
+local overlays = {}
+for i = 20, 80, 2 do
+    table.insert(overlays, color_overlay("red", i))
+end
+data:extend(overlays)
+
 data:extend({
     {
         type = "radar",

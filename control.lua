@@ -36,10 +36,17 @@ script.on_event(defines.events.on_tick, function(event)
 end)
 
 -- Strip backer names from HARPA emitters
-script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity}, function(event)
+script.on_event(defines.events.on_built_entity, function(event)
 	if event.created_entity.name == "biter-emitter" then
 		event.created_entity.backer_name = ""
-		Harpa.register(event.created_entity)
+		Harpa.register(event.created_entity, event.player_index)
+	end
+end)
+
+script.on_event(defines.events.on_robot_built_entity, function(event)
+	if event.created_entity.name == "biter-emitter" then
+		event.created_entity.backer_name = ""
+		Harpa.register(event.created_entity, nil)
 	end
 end)
 
