@@ -94,9 +94,9 @@ function Harpa.tick_emitter(entity, logger)
     local row = ((math.floor(entity.position.y) + math.floor(entity.position.x) + game.tick) % 60) - 30
     local pos = entity.position
     local area = {left_top = {pos.x - 30, pos.y - row}, right_bottom = {pos.x + 30, pos.y - row + 1}}
-    logger:log("HARPA at (" .. pos.x .. ", " .. pos.y ..") emitting from {(" .. area.left_top[1] .. ", " .. area.left_top[2] .. "), (" .. area.right_bottom[1] .. ", " .. area.right_bottom[2] .. ")}")
+    -- logger:log("HARPA at (" .. pos.x .. ", " .. pos.y ..") emitting from {(" .. area.left_top[1] .. ", " .. area.left_top[2] .. "), (" .. area.right_bottom[1] .. ", " .. area.right_bottom[2] .. ")}")
     local biters = entity.surface.find_entities_filtered({area = area, type = "unit", force = "enemy"})
-    logger:log("HARPA found " .. #biters .. " in emitting area")
+    -- logger:log("HARPA found " .. #biters .. " in emitting area")
 
     local emitter_area = {left_top = {pos.x - 50, pos.y - 50}, right_bottom = {pos.x + 50, pos.y + 50}}
     for _, biter in ipairs(biters) do
@@ -127,7 +127,7 @@ function Harpa.tick_emitter(entity, logger)
                 command = {type = defines.command.attack, target = entity, distraction = distraction.none}
                 ignore_time = 60 * 60
             end
-            logger:log("Biter command: " .. serpent.block(command))
+            -- logger:log("Biter command: " .. serpent.block(command))
             if not pcall(biter.set_command, command) then
                 logger:log("Error executing biter command command: " .. serpent.block(command))
             end
