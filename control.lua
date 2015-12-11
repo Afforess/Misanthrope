@@ -41,6 +41,7 @@ script.on_event(defines.events.on_built_entity, function(event)
 		event.created_entity.backer_name = ""
 		Harpa.register(event.created_entity, event.player_index)
 	end
+	check_power(event.created_entity, nil)
 end)
 
 script.on_event(defines.events.on_robot_built_entity, function(event)
@@ -48,7 +49,24 @@ script.on_event(defines.events.on_robot_built_entity, function(event)
 		event.created_entity.backer_name = ""
 		Harpa.register(event.created_entity, nil)
 	end
+	check_power(event.created_entity, nil)
 end)
+
+script.on_event(defines.events.on_entity_died, function(event)
+	check_power(event.entity, event.entity)
+end)
+
+script.on_event(defines.events.on_player_mined_item, function(event)
+	if game.entity_prototypes[event.item_stack.name].type == "electric-pole" then
+		Harpa.update_power_grid(game.players[event.player_index].character.position, 10, nil)
+	end
+end)
+
+function check_power(entity, ignore_entity)
+	if entity.prototype.type == "electric-pole" then
+		Harpa.update_power_grid(entity.position, 10, ignore_entity)
+	end
+end
 
 function mergeTables(table1, table2)
 	newTable = table1

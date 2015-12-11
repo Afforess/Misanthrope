@@ -6,16 +6,75 @@ function Harpa.register(entity, player_idx)
     if not global.harpa_list then
         global.harpa_list = {}
     end
+    if not global.unpowered_harpa_list then
+        global.unpowered_harpa_list = {}
+    end
     if not global.biter_ignore_list then
         global.biter_ignore_list = {}
     end
     if not global.harpa_overlays then
         global.harpa_overlays = {}
     end
-    if player_idx then
-        Harpa.create_overlay(entity, player_idx)
+    
+    if Harpa.is_powered(entity, nil) then
+        if player_idx then
+            Harpa.create_overlay(entity, player_idx)
+        end
+        table.insert(global.harpa_list, entity)
+    else
+        table.insert(global.unpowered_harpa_list, entity)
     end
-    table.insert(global.harpa_list, entity)
+end
+
+function Harpa.update_power_grid(position, range, ignore_entity)
+    if not global.unpowered_harpa_list then
+        return
+    end
+    local range_squared = range * range
+    
+    -- check inactive emitters to see if they gained power
+    for i = #global.unpowered_harpa_list, 1, -1 do
+        local harpa = global.unpowered_harpa_list[i]
+        if harpa.valid then
+            local harpa_pos = harpa.position
+            local dist_squared = (position.x - harpa_pos.x) * (position.x - harpa_pos.x) + (position.y - harpa_pos.y) * (position.y - harpa_pos.y)
+            if range_squared > dist_squared then
+                if Harpa.is_powered(harpa, ignore_entity) then
+                    table.remove(global.unpowered_harpa_list, i)
+                    table.insert(global.harpa_list, harpa)
+                end
+            end
+        else
+            table.remove(global.unpowered_harpa_list, i)
+        end
+    end
+    
+    -- check active emitters to verify they still have power
+    for i = #global.harpa_list, 1, -1 do
+        local harpa = global.harpa_list[i]
+        if harpa.valid then
+            local harpa_pos = harpa.position
+            local dist_squared = (position.x - harpa_pos.x) * (position.x - harpa_pos.x) + (position.y - harpa_pos.y) * (position.y - harpa_pos.y)
+            if range_squared > dist_squared then
+                if not Harpa.is_powered(harpa, ignore_entity) then
+                    table.remove(global.harpa_list, i)
+                    table.insert(global.unpowered_harpa_list, harpa)
+                    Harpa.disable_overlay(harpa)
+                end
+            end
+        else
+            table.remove(global.harpa_list, i)
+        end
+    end
+end
+
+function Harpa.disable_overlay(entity)
+    for i = #global.harpa_overlays, 1, -1 do
+        local overlay = global.harpa_overlays[i]
+        if overlay.harpa == entity then
+            overlay.ticks_remaining = -1
+        end
+    end
 end
 
 function Harpa.create_overlay(entity, player_idx)
@@ -87,6 +146,37 @@ function Harpa.tick(logger)
             end
         end
     end
+end
+
+-- only a best guess based on nearby electric poles
+function Harpa.is_powered(entity, ignore_entity)
+    local surface = entity.surface
+    local position = entity.position
+    local ranges_squared = {}; ranges_squared["small-electric-pole"] = 2.5; ranges_squared["medium-electric-pole"] = 3.5; ranges_squared["big-electric-pole"] = 2; ranges_squared["substation"] = 7
+    local electric_poles = surface.find_entities_filtered({area = Harpa.area_around(position, 10), type = "electric-pole", force = "player"})
+    for i = 1, #electric_poles do
+        local electric_pole = electric_poles[i]
+        if electric_pole ~= ignore_entity then
+            local range = ranges_squared[electric_pole.prototype.name]
+            
+            local pole_pos = electric_pole.position
+            local dist_squared = (position.x - pole_pos.x) * (position.x - pole_pos.x) + (position.y - pole_pos.y) * (position.y - pole_pos.y)
+            if range ~= nil and Harpa.is_inside_area(Harpa.area_around(pole_pos, range), position) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Harpa.is_inside_area(area, position)
+    return position.x > area.left_top.x and position.y > area.left_top.y and 
+            position.x < area.right_bottom.x and position.y < area.right_bottom.y
+end
+
+function Harpa.area_around(position, distance)
+    return {left_top = {x = position.x - distance, y = position.y - distance},
+            right_bottom = {x = position.x + distance, y = position.y + distance}}
 end
 
 function Harpa.tick_emitter(entity, logger)

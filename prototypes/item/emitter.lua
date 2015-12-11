@@ -7,6 +7,7 @@ data:extend({
         subgroup = "defensive-structure",
         order = "c-c",
 		place_result = "biter-emitter",
+		enable = false,
 		stack_size = 4
 	},
 })
