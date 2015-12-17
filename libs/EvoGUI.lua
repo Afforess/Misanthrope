@@ -19,8 +19,6 @@ function EvoGUI.new(expansion_phases)
             text = "Evolution Rate:",
             caption = "Evolution Rate"
         })
-        
-        EvoGUI:updateGUI()
     end
 
     function EvoGUI:createEvolutionRateText()
@@ -64,6 +62,10 @@ function EvoGUI.new(expansion_phases)
         remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", self:createEvolutionRateText(), self:calculateEvolutionRateColor())
     end
     
+    if EvoGUI.detected then
+        EvoGUI:updateGUI()
+    end
+
     return EvoGUI
 end
 
