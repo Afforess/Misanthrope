@@ -91,8 +91,8 @@ function Map.new(logger)
                 local value = target_data.value * 10000
                 local defenses = region:getDangerCache():getDanger(targets[i].position)
                 local attack_count = region:get_count_attack_on_position(targets[i].position)
-                value = value / (1 + defenses)
-                value = value / (1 + attack_count)
+                value = value / math.max(1, 1 + defenses)
+                value = value / math.max(1, 1 + attack_count)
                 self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. ". Base value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
                 if value > highest_value then
                     highest_value = value
@@ -106,8 +106,7 @@ function Map.new(logger)
             end
             self.l:log("Region attacked_positions: " .. self.l:toString(region.attacked_positions))
             self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
-            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(10, 200) + 1, unit_search_distance = 256})
-            region:mark_attack_position(highest_value_entity.position, self.l)
+            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(10, 50) + 1, unit_search_distance = 32 + math.random(64, 128)})
             region:mark_attack_position(highest_value_entity.position, self.l)
 
             return true
@@ -188,8 +187,8 @@ function Map.new(logger)
     end
 
     function Map:iterateEnemyRegions()
-        -- check and update enemy regions every 1 s in non-peaceful, and every 30s in peaceful
-        local frequency = 60
+        -- check and update enemy regions every 10 s in non-peaceful, and every 30s in peaceful
+        local frequency = 600
         if global.expansion_state == "peaceful" then
             frequency = 30 * 60
         end
@@ -209,8 +208,6 @@ function Map.new(logger)
                     if global.expansion_state ~= "Peaceful" then
                         self:updateRegionAI(enemyRegion, false)
                     end
-
-                    self.l:log(enemyRegion:tostring() .. " still has enemy spawners.")
     			end
     		end
     	end
