@@ -26,7 +26,8 @@ function DangerCache:tostring()
 end
 
 function DangerCache:calculate()
-    self:reset()
+    self:reset(false)
+    self.calculated_at = game.tick
     
     local area = self.region:regionArea()
     -- examine area +/- 25 blocks around edge of area, turrets may be slightly outside region
@@ -65,6 +66,14 @@ function DangerCache:calculate()
             end                
         end
     end
+    
+    -- update serialized data
+    self:save()
+end
+
+function DangerCache:save()
+    local index = bit32.bor(bit32.lshift(self.region:getX(), 16), bit32.band(self.region:getY(), 0xFFFF))
+    global.dangerCache[index] = self:serialize()
 end
 
 function DangerCache:getDanger(position)
@@ -78,7 +87,7 @@ function DangerCache:getDanger(position)
     return -1
 end
 
-function DangerCache:reset()
+function DangerCache:reset(save)
     self.danger_cache = {}
     local size = 128
 
@@ -90,16 +99,28 @@ function DangerCache:reset()
              self.danger_cache[x][y] = 0
         end
     end
+    if save then
+        -- update serialized data
+        self:save()
+    end
 end
 
 function DangerCache:calculatedAt()
     return self.calculated_at
 end
 
--- create region from factorio position
+function DangerCache:serialize()
+    return {calculated_at = self.calculated_at, region = {x = self.region:getX(), y = self.region:getY()}, danger_cache = self.danger_cache}
+end
+
+function DangerCacheClass.deserialize(data, RegionClass)
+    return setmetatable({calculated_at = data.calculated_at, region = RegionClass.byRegionCoords(data.region), danger_cache = data.danger_cache}, DangerCache)
+end
+
 function DangerCacheClass.new(region)
     local self = setmetatable({calculated_at = -1, region = region, danger_cache = {}}, DangerCache)
-    self:reset()
+    self:reset(false)
     return self
 end
+
 return DangerCacheClass

@@ -41,6 +41,8 @@ script.on_event(defines.events.on_built_entity, function(event)
 		event.created_entity.backer_name = ""
 		Harpa.register(event.created_entity, event.player_index)
 	end
+	update_regional_targets(event.created_entity)
+	update_danger_cache(event.created_entity)
 	check_power(event.created_entity, nil)
 end)
 
@@ -49,6 +51,8 @@ script.on_event(defines.events.on_robot_built_entity, function(event)
 		event.created_entity.backer_name = ""
 		Harpa.register(event.created_entity, nil)
 	end
+	update_regional_targets(event.created_entity)
+	update_danger_cache(event.created_entity)
 	check_power(event.created_entity, nil)
 end)
 
@@ -63,6 +67,31 @@ script.on_event(defines.events.on_player_mined_item, function(event)
 		end
 	end
 end)
+
+function update_regional_targets(entity)
+	if entity.force.name == "player" then
+		local region = map:get_region(entity.position)
+		local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
+		if not global.regionHasAnyTargets[index] then
+			l:log(region:tostring() .. " has available targets, cache cleared.")
+		end
+		global.regionHasAnyTargets[index] = true
+	end
+end
+
+function update_danger_cache(entity)
+	if entity.force.name == "player" then
+		local region = map:get_region(entity.position)
+		local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
+		for i = 1, #turret_names do
+			if entity.name == turret_names[i] then
+				map:reset_danger_cache(entity.position)
+				return true
+			end
+		end
+	end
+	return false
+end
 
 function check_power(entity, ignore_entity)
 	if entity.prototype.type == "electric-pole" then

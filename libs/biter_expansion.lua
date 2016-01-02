@@ -101,10 +101,10 @@ function BiterExpansion.new(logger)
             local ticks_played = game.tick
             -- more generous to marathon or rso players
             if self.is_marathon_enabled() then
-                ticks_played = ticks_played / 2
+                ticks_played = (ticks_played * 2) / 3
             end
             if self.is_rso_enabled() then
-                ticks_played = ticks_played / 2
+                ticks_played = (ticks_played * 2) / 3
             end
             -- At 12 hours, the time factor will be at 0.000004 (vanilla value).
             -- after 108 hours of game play, max value of 0.00002 will be reached

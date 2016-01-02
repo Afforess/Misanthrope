@@ -6,6 +6,7 @@ Logger.__index = Logger
 
  -- tracks if the log file has ever been written to, for append vs replace in write_file
 local ever_written = false
+local debug = false
 
 function Logger:log(str)
     local run_time_s = math.floor(game.tick/60)
@@ -13,11 +14,10 @@ function Logger:log(str)
     local run_time_hours = math.floor(run_time_minutes/60)
     self.log_buffer[#self.log_buffer + 1] = string.format("%02d:%02d:%02d: %s\r\n", run_time_hours, run_time_minutes % 60, run_time_s % 60, str)
     self:checkOutput()
-    self:dump()
 end
 
 function Logger:checkOutput()
-    if self.last_write_size ~= #self.log_buffer and (game.tick - self.last_write_tick) > 60 then
+    if self.last_write_size ~= #self.log_buffer and (debug or (game.tick - self.last_write_tick) > 3600) then
         self:dump()
     end
 end

@@ -126,35 +126,57 @@ function Region:offset(dx, dy)
 end
 
 function Region:getDangerCache()
-    return self.danger_cache
+    local index = bit32.bor(bit32.lshift(self.x, 16), bit32.band(self.y, 0xFFFF))
+    local danger_cache = global.dangerCache[index]
+    if danger_cache == nil then
+        danger_cache = DangerCache.new(self)
+        global.dangerCache[index] = danger_cache:serialize()
+    else
+        danger_cache = DangerCache.deserialize(danger_cache, RegionClass)
+    end
+    return danger_cache
+end
+
+-- locations biters have been previously assigned to attack
+function Region:get_attacked_positions()
+    local index = bit32.bor(bit32.lshift(self.x, 16), bit32.band(self.y, 0xFFFF))
+    local attacked_positions = global.previousBiterAttacks[index]
+    if attacked_positions == nil then
+        attacked_positions = {}
+        global.previousBiterAttacks[index] = attacked_positions
+    end
+    return attacked_positions
 end
 
 function Region:mark_attack_position(pos, logger)
-    logger:log("mark_attack_position")
-
-    x = math.floor(pos.x)
-    y = math.floor(pos.y)
-    found = false
-    for i = 1, #self.attacked_positions do
-        if self.attacked_positions[i].x == x and self.attacked_positions[i].y == y then
-            self.attacked_positions[i].count = self.attacked_positions[i].count + 1
+    local x = math.floor(pos.x)
+    local y = math.floor(pos.y)
+    local found = false
+    local attacked_positions = self:get_attacked_positions()
+    for i = #attacked_positions, 1, -1 do
+        local prev_attack = attacked_positions[i]
+        if prev_attack.tick + (60 * 60 * 60) < game.tick then
+            -- forget attacks longer than 1 hr ago
+            table.remove(attacked_positions, i)
+        elseif prev_attack.x == x and prev_attack.y == y then
+            prev_attack.count = prev_attack.count + 1
+            prev_attack.tick = game.tick
             found = true
-            logger:log("Found position " .. logger:toString(self.attacked_positions[i]) .. " with count of " .. self.attacked_positions[i].count)
             break
         end
     end
     if not found then
-        logger:log("Adding position " .. logger:toString( { x = x, y = y, count = 1 } ))
-        table.insert(self.attacked_positions, { x = x, y = y, count = 1 })
+        table.insert(attacked_positions, { x = x, y = y, count = 1, tick = game.tick })
     end
 end
 
 function Region:get_count_attack_on_position(pos)
-    x = math.floor(pos.x)
-    y = math.floor(pos.y)
-    for i = 1, #self.attacked_positions do
-        if self.attacked_positions[i].x == x and self.attacked_positions[i].y == y then
-            return self.attacked_positions[i].count
+    local x = math.floor(pos.x)
+    local y = math.floor(pos.y)
+    local attacked_positions = self:get_attacked_positions()
+    for i = 1, #attacked_positions do
+        if attacked_positions[i].x == x and attacked_positions[i].y == y then
+            return attacked_positions[i].count
         end
     end
     return 0
@@ -172,8 +194,6 @@ function RegionClass.new(pos)
     if (pos.y < 0) then
         self.y = self.y - MAX_UINT
     end
-    self.danger_cache = DangerCache.new(self)
-    self.attacked_positions = {}
     
     return self
 end
@@ -183,8 +203,6 @@ function RegionClass.byRegionCoords(regionCoords)
     local self = setmetatable({}, Region)
     self.x = math.floor(regionCoords.x)
     self.y = math.floor(regionCoords.y)
-    self.danger_cache = DangerCache.new(self)
-    self.attacked_positions = {}
 
     return self
 end

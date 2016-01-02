@@ -1,28 +1,42 @@
 require "defines"
-local linked_list = require "libs/linked_list"
 local Region = require "libs/region"
 
 Map = {}
 
 function Map.new(logger)
+    -- list of regions to scan for biter or spitter spawners. When empty, the map is re-scanned.
     if not global.regionQueue then
         global.regionQueue = {}
     end
+    -- list of regions scanned
     if not global.visitedRegions then
         global.visitedRegions = {}
     end
+    -- list of power lines that may be targeted for a power short
     if not global.powerLineTargets then
         global.powerLineTargets = {}
     end
+    -- list of power short entities and associated entity data
     if not global.powerShorts then
         global.powerShorts = {}
     end
-    if not global.powerShorts then
-        global.powerShorts = {}
+    -- list of regions with biter or spitter spawners in them
+    if not global.enemyRegionQueue then
+        global.enemyRegionQueue = {}
     end
-    global.enemyRegions = nil
-
-    local Map = { l = logger, enemyRegions = linked_list()}
+    -- cache of danger value for region areas.
+    if not global.dangerCache then
+        global.dangerCache = {}
+    end
+    -- cache of Misanthrope-caused biter attacks for each region
+    if not global.previousBiterAttacks then
+        global.previousBiterAttacks = {}
+    end
+    -- cache indicates if a region has any entities owned by the player force in them
+    if not global.regionHasAnyTargets then
+        global.regionHasAnyTargets = {}
+    end
+    local Map = { l = logger}
 
     function Map:tick()
         self:iterateMap()
@@ -57,61 +71,69 @@ function Map.new(logger)
     BITER_TARGETS["express-transport-belt-to-ground"] = {value= 80}
     BITER_TARGETS["fast-transport-belt-to-ground"] = {value= 50}
     BITER_TARGETS["basic-transport-belt-to-ground"] = {value= 30}
-    BITER_TARGETS["basic-transport-belt-to-ground"] = {value= 30}
 
     BITER_TARGETS["offshore-pump"] = {value= 150}
     BITER_TARGETS["storage-tank"] = {value= 50}
+    
+    function Map:reset_danger_cache(position)
+        local region = Region.new(position)
+        region:getDangerCache():reset(true)
+        self.l:log("Reset danger cache for " .. region:tostring())
+    end
+    
+    function Map:get_region(position)
+        return Region.new(position)
+    end
 
-    function Map:updateRegionAI(region, recursive)
+    function Map:updateRegionAI(region)
         self.l:log("Updating biter AI for " .. region:tostring())
-
-        if not self:attackTargets(region) then
-            self.l:log("No targets found!")
-            if not recursive then
-                --self:updateRegionAI(region:offset(0, 1), true)
-                --self:updateRegionAI(region:offset(0, -1), true)
-                --self:updateRegionAI(region:offset(1, 0), true)
-                --self:updateRegionAI(region:offset(-1, 0), true)
-            end
-        end
+        self:attackTargets(region)
     end
 
     function Map:attackTargets(region)
         -- setting highest_value > 0 means don't attack if there are only targets with good defenses
         local highest_value = 10000
         local highest_value_entity = nil
+        local any_targets = false
         for entity_name, target_data in pairs(BITER_TARGETS) do
             local targets = region:findEntities({entity_name})
             for i = 1, #targets do
-                if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 10) then
+                any_targets = true
+                -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
+                if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 60 * 3) then
+                    self.l:log(region:tostring() .. " - Danger cache recalculating...")
                     region:getDangerCache():calculate()
                     --self.l:log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
                 end
                 
-                local value = target_data.value * 10000
+                local value = (target_data.value + math.random(target_data.value)) * 10000
                 local defenses = region:getDangerCache():getDanger(targets[i].position)
                 local attack_count = region:get_count_attack_on_position(targets[i].position)
                 value = value / math.max(1, 1 + defenses)
                 value = value / math.max(1, 1 + attack_count)
-                self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. ". Base value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                -- self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
                 if value > highest_value then
                     highest_value = value
                     highest_value_entity = targets[i]
                 end
             end
         end
+        
+        -- cache whether any player-made structures exist in the region, don't bother attacking again until it does
+        local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
+        global.regionHasAnyTargets[index] = any_targets
+        
         if highest_value_entity ~= nil then
             if highest_value_entity.type == "electric-pole" then
                 self:trackPowerLine(highest_value_entity)
             end
-            self.l:log("Region attacked_positions: " .. self.l:toString(region.attacked_positions))
             self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
-            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(10, 50) + 1, unit_search_distance = 32 + math.random(64, 128)})
+            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(15, 75) + 10, unit_search_distance = 48 + math.random(64, 128)})
             region:mark_attack_position(highest_value_entity.position, self.l)
 
             return true
         else
-            self.l:log("No valuable targets.")
+            self.l:log("No valuable targets for " .. region:tostring())
             return false
         end
     end
@@ -131,13 +153,13 @@ function Map.new(logger)
             if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
                 local powerLine = global.powerLineTargets[i].entity
                 local enemies = powerLine.surface.find_enemy_units(powerLine.position, 2)
-                self.l:log(#enemies .. " Nearby enemies to powerline at " .. self.l:toString(powerLine.position))
+                --self.l:log(#enemies .. " Nearby enemies to powerline at " .. self.l:toString(powerLine.position))
                 if #enemies > 0 then
                     local roll = math.random(1000)
                     if game.darkness > 0.5 then
                         roll = math.random(500)
                     end
-                    self.l:log("Rolled a " .. roll .. " to short out power lines")
+                    --self.l:log("Rolled a " .. roll .. " to short out power lines")
                     if roll < 10 then
                         local position = {x = powerLine.position.x + 0.5, y = powerLine.position.y + 0.5}
                         local powerShort = powerLine.surface.create_entity({name = "power-short", position = position, force = powerLine.force})
@@ -174,51 +196,56 @@ function Map.new(logger)
 
     -- removes any invalid lines
     function Map:updatePowerLines()
-        local valid = {}
-        for i = 1, #global.powerLineTargets do
+        for i = #global.powerLineTargets, 1, -1 do
             if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
                 -- don't track lines older than 5 min
-                if math.abs(game.tick - global.powerLineTargets[i].age) < 18000 then
-                    valid[#valid + 1] = global.powerLineTargets[i]
+                if math.abs(game.tick - global.powerLineTargets[i].age) > 18000 then
+                    table.remove(global.powerLineTargets, i)
                 end
             end
         end
-        global.powerLineTargets = valid
     end
 
     function Map:iterateEnemyRegions()
-        -- check and update enemy regions every 10 s in non-peaceful, and every 30s in peaceful
+        -- check and update enemy regions every 10 s in non-peaceful, and every 60s in peaceful
         local frequency = 600
-        if global.expansion_state == "peaceful" then
-            frequency = 30 * 60
+        if global.expansion_state == "Peaceful" then
+            frequency = 3600
         end
 
     	if (game.tick % frequency == 0) then
-    		local enemyRegion = self.enemyRegions:pop_front()
-    		if enemyRegion == nil then
+    		if #global.enemyRegionQueue == 0 then
     			self.l:log("No enemy regions found.")
     		else
-    			if #enemyRegion:findEntities({"biter-spawner", "spitter-spawner"}) == 0 then
-    				-- enemy spawners have been destroyed
-                    self.l:log(enemyRegion:tostring() .. " no longer has enemy spawners. Removing from list of enemy regions.")
-    			else
-    				-- add back to end of linked list
-    				self.enemyRegions:push_back(enemyRegion)
-
-                    if global.expansion_state ~= "Peaceful" then
-                        self:updateRegionAI(enemyRegion, false)
+                for i = 1, 5 do
+                    local enemyRegionCoords = table.remove(global.enemyRegionQueue, 1)
+                    local enemyRegion = Region.byRegionCoords(enemyRegionCoords)
+                    
+                    local index = bit32.bor(bit32.lshift(enemyRegionCoords.x, 16), bit32.band(enemyRegionCoords.y, 0xFFFF))
+                    local any_targets = global.regionHasAnyTargets[index] or global.regionHasAnyTargets[index] == nil
+                    if not any_targets then
+                        self.l:log("No targets available (cache: " .. index .. ") in " .. enemyRegion:tostring())
                     end
-    			end
+                    
+        			if any_targets and #enemyRegion:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
+                        global.enemyRegionQueue[#global.enemyRegionQueue + 1] = enemyRegionCoords
+
+                        if global.expansion_state ~= "Peaceful" then
+                            self:updateRegionAI(enemyRegion)
+                        end
+                        break
+        			end
+                end
     		end
     	end
     end
 
     function Map:iterateMap()
-    	if (game.tick % 30 == 0) then
+    	if (game.tick % 120 == 0) then
     		local region = self:nextRegion()
 
     		if not self:isEnemyRegion(region) and #region:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
-    			self.enemyRegions:push_back(region)
+    			global.enemyRegionQueue[#global.enemyRegionQueue + 1] = {x = region:getX(), y = region:getY()}
     		end
     	end
     end
@@ -273,8 +300,8 @@ function Map.new(logger)
     end
 
     function Map:isEnemyRegion(region)
-    	for enemyRegion in self.enemyRegions:iterate() do
-    		if (enemyRegion:getX() == region:getX() and enemyRegion:getY() == region:getY()) then
+    	for _, enemyRegion in pairs(global.enemyRegionQueue) do
+    		if (enemyRegion.x == region:getX() and enemyRegion.y == region:getY()) then
     			return true
     		end
     	end
