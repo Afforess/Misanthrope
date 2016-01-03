@@ -15,7 +15,7 @@ function Harpa.register(entity, player_idx)
     if not global.harpa_overlays then
         global.harpa_overlays = {}
     end
-    
+
     if Harpa.is_powered(entity, nil) then
         if player_idx then
             Harpa.create_overlay(entity, player_idx)
@@ -142,7 +142,46 @@ function Harpa.tick(logger)
             if not harpa.valid then
                 table.remove(global.harpa_list, i)
             else
-                Harpa.tick_emitter(harpa, logger)
+                Harpa.tick_emitter(harpa, logger, 30)
+            end
+        end
+    end
+    Harpa.update_power_armor(logger)
+end
+
+function Harpa.has_micro_emitter(player)
+    if player.valid and player.connected then
+        local armor = player.get_inventory(defines.inventory.player_armor)[1]
+        if (armor.valid_for_read and armor.has_grid) then
+            local grid = armor.grid
+            for _, equipment in pairs(grid.equipment) do
+                if equipment.name == "micro-biter-emitter" then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+function Harpa.update_power_armor(logger)
+    -- hack because we can not tell when armor modules change, so check every 5s for players with micro harpa emitter 
+    if game.tick % 300 == 0 then
+        global.micro_harpa_players = {}
+        for i = 1, #game.players do
+            local player = game.players[i]
+            if Harpa.has_micro_emitter(player) then
+                table.insert(global.micro_harpa_players, player)
+            end
+        end
+    end
+    if global.micro_harpa_players then
+        for i = #global.micro_harpa_players, 1, -1 do
+            local player = global.micro_harpa_players[i]
+            if Harpa.has_micro_emitter(player) then
+                Harpa.tick_emitter(player, logger, 16)
+            else
+                table.remove(global.micro_harpa_players, i)
             end
         end
     end
@@ -179,23 +218,25 @@ function Harpa.area_around(position, distance)
             right_bottom = {x = position.x + distance, y = position.y + distance}}
 end
 
-function Harpa.tick_emitter(entity, logger)
+-- called every tick... keep it optimized
+function Harpa.tick_emitter(entity, logger, radius)
     -- using x and y and tick for modulus assures emitters next to each other will scan separate rows
-    local row = ((math.floor(entity.position.y) + math.floor(entity.position.x) + game.tick) % 60) - 30
+    local diameter = radius * 2
     local pos = entity.position
-    local area = {left_top = {pos.x - 30, pos.y - row}, right_bottom = {pos.x + 30, pos.y - row + 1}}
-    -- logger:log("HARPA at (" .. pos.x .. ", " .. pos.y ..") emitting from {(" .. area.left_top[1] .. ", " .. area.left_top[2] .. "), (" .. area.right_bottom[1] .. ", " .. area.right_bottom[2] .. ")}")
-    local biters = entity.surface.find_entities_filtered({area = area, type = "unit", force = "enemy"})
-    -- logger:log("HARPA found " .. #biters .. " in emitting area")
+    local surface = entity.surface
+    local row = ((math.floor(pos.y) + math.floor(pos.x) + game.tick) % diameter) - radius
+    local area = {left_top = {pos.x - radius, pos.y - row}, right_bottom = {pos.x + radius, pos.y - row + 1}}
+    local biters = surface.find_entities_filtered({area = area, type = "unit", force = "enemy"})
 
-    local emitter_area = {left_top = {pos.x - 50, pos.y - 50}, right_bottom = {pos.x + 50, pos.y + 50}}
+    local emitter_area = {left_top = {pos.x - diameter, pos.y - diameter}, right_bottom = {pos.x + diameter, pos.y + diameter}}
     for _, biter in ipairs(biters) do
         local roll = math.random(0, 100)
+        local biter_pos = biter.position
         -- random chance to 1-shot kill a biter (as long as it is not a behemoth)
         if (roll >= 99) and biter.prototype.max_health < 2500 then
             biter.damage(biter.prototype.max_health, "player")
         else
-            distance = math.sqrt((biter.position.x - entity.position.x) * (biter.position.x - entity.position.x) + (biter.position.y - entity.position.y) * (biter.position.y - entity.position.y))
+            distance = math.sqrt((biter_pos.x - pos.x) * (biter_pos.x - pos.x) + (biter_pos.y - pos.y) * (biter_pos.y - pos.y))
             biter.damage(math.min(100, biter.prototype.max_health / (1 + distance)), "player")
         end
 
@@ -203,11 +244,11 @@ function Harpa.tick_emitter(entity, logger)
         if biter.valid and not Harpa.ignore_biter(biter) then
             local command = {}
             local ignore_time = 60 * 5
-            
+
             -- emitter only works on non-behemoth biters
             if biter.prototype.max_health < 2500 then
-                local destination = Harpa.nearest_corner(biter.position, emitter_area, math.random(1, 10), math.random(1, 10))
-                destination = biter.surface.find_non_colliding_position(biter.name, destination, 20, 0.3)
+                local destination = Harpa.nearest_corner(biter_pos, emitter_area, math.random(1, 10), math.random(1, 10))
+                destination = surface.find_non_colliding_position(biter.name, destination, 20, 0.3)
                 command = {type = defines.command.compound, structure_type = defines.compoundcommandtype.logical_and, commands = {
                     {type = defines.command.go_to_location, distraction = defines.distraction.by_damage, destination = destination},
                     {type = defines.command.wander}
@@ -217,19 +258,18 @@ function Harpa.tick_emitter(entity, logger)
                 command = {type = defines.command.attack, target = entity, distraction = distraction.none}
                 ignore_time = 60 * 60
             end
-            -- logger:log("Biter command: " .. serpent.block(command))
             if not pcall(biter.set_command, command) then
                 logger:log("Error executing biter command command: " .. serpent.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end
     end
-    
-    local spawners = entity.surface.find_entities_filtered({area = area, type = "unit-spawner", force = "enemy"})
+
+    local spawners = surface.find_entities_filtered({area = area, type = "unit-spawner", force = "enemy"})
     for _, spawner in ipairs(spawners) do
         spawner.damage(spawner.prototype.max_health / 250, "player")
     end
-    local worms = entity.surface.find_entities_filtered({area = area, type = "turret", force = "enemy"})
+    local worms = surface.find_entities_filtered({area = area, type = "turret", force = "enemy"})
     for _, worm in ipairs(worms) do
         worm.damage(worm.prototype.max_health / 100, "player")
     end

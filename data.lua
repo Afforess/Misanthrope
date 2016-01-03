@@ -1,4 +1,5 @@
 require("prototypes.entity.power_short")
+require("prototypes.equipment.equipment")
 require("prototypes.item.emitter")
 require("prototypes.entity.emitter")
 require("prototypes.recipes.emitter")
