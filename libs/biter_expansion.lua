@@ -42,7 +42,11 @@ function BiterExpansion.new(logger)
         if expansion_phase.tick then
             expansion_phase:tick()
         end
-        self:update_expansion_factors(expansion_phase)
+        
+        -- apparently this is really slow
+        if game.tick % 600 == 0 then
+            self:update_expansion_factors(expansion_phase)
+        end
     end
 
     function self:update_expansion_phase()

@@ -8,10 +8,6 @@ function Map.new(logger)
     if not global.regionQueue then global.regionQueue = {} end
     -- list of regions scanned
     if not global.visitedRegions then global.visitedRegions = {} end
-    -- list of power lines that may be targeted for a power short
-    if not global.powerLineTargets then global.powerLineTargets = {} end
-    -- list of power short entities and associated entity data
-    if not global.powerShorts then global.powerShorts = {} end
     -- list of regions with biter or spitter spawners in them
     if not global.enemyRegionQueue then global.enemyRegionQueue = {} end
     -- cache of danger value for region areas.
@@ -26,15 +22,6 @@ function Map.new(logger)
     function Map:tick()
         self:iterateMap()
         self:iterateEnemyRegions()
-        if game.tick % 3600 == 0 then
-            self:updatePowerLines()
-        end
-
-        if game.tick % 60 == 0 then
-            self:checkPowerLinesForShorts()
-        end
-
-        self:updatePowerShorts()
     end
 
     BITER_TARGETS = {}
@@ -109,9 +96,6 @@ function Map.new(logger)
         global.regionHasAnyTargets[index] = any_targets
         
         if highest_value_entity ~= nil then
-            if highest_value_entity.type == "electric-pole" then
-                self:trackPowerLine(highest_value_entity)
-            end
             self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
             highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(15, 75) + 10, unit_search_distance = 48 + math.random(64, 128)})
             region:mark_attack_position(highest_value_entity.position, self.l)
@@ -120,74 +104,6 @@ function Map.new(logger)
         else
             self.l:log("No valuable targets for " .. region:tostring())
             return false
-        end
-    end
-
-    function Map:trackPowerLine(entity)
-        for i = 1, #global.powerLineTargets do
-            if global.powerLineTargets[i].entity == entity then
-                return false
-            end
-        end
-        global.powerLineTargets[#global.powerLineTargets + 1] = {entity = entity, age = game.tick}
-        return true
-    end
-
-    function Map:checkPowerLinesForShorts()
-        for i = 1, #global.powerLineTargets do
-            if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
-                local powerLine = global.powerLineTargets[i].entity
-                local enemies = powerLine.surface.find_enemy_units(powerLine.position, 2)
-                --self.l:log(#enemies .. " Nearby enemies to powerline at " .. self.l:toString(powerLine.position))
-                if #enemies > 0 then
-                    local roll = math.random(1000)
-                    if game.darkness > 0.5 then
-                        roll = math.random(500)
-                    end
-                    --self.l:log("Rolled a " .. roll .. " to short out power lines")
-                    if roll < 10 then
-                        local position = {x = powerLine.position.x + 0.5, y = powerLine.position.y + 0.5}
-                        local powerShort = powerLine.surface.create_entity({name = "power-short", position = position, force = powerLine.force})
-                        global.powerShorts[#global.powerShorts + 1] = {entity = powerShort, ticks_left = math.random(6, 25)}
-                        
-                        -- create a duplicate power line entity and explode it immediately for the animation
-                        local animation = powerLine.surface.create_entity({name = powerLine.name, position = powerLine.position, force = powerLine.force})
-                        if animation ~= nil then
-                            animation.die()
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    function Map:updatePowerShorts()
-        if #global.powerShorts > 0 then
-            local valid = {}
-            for i = 1, #global.powerShorts do
-                local short = global.powerShorts[i]
-                if short ~= nil and short.entity ~= nil and short.entity.valid then
-                    short.ticks_left = short.ticks_left - 1
-                    if short.ticks_left > 1 then
-                        valid[#valid + 1] = short
-                    else
-                        short.entity.destroy()
-                    end
-                end
-            end
-            global.powerShorts = valid
-        end
-    end
-
-    -- removes any invalid lines
-    function Map:updatePowerLines()
-        for i = #global.powerLineTargets, 1, -1 do
-            if global.powerLineTargets[i] ~= nil and global.powerLineTargets[i].entity ~= nil and global.powerLineTargets[i].entity.valid then
-                -- don't track lines older than 5 min
-                if math.abs(game.tick - global.powerLineTargets[i].age) > 18000 then
-                    table.remove(global.powerLineTargets, i)
-                end
-            end
         end
     end
 
