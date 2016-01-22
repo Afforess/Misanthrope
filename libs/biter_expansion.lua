@@ -90,9 +90,9 @@ function BiterExpansion.new(logger)
         self:reset_unit_group()
 
         -- cause pollution to spread farther
-        game.map_settings.pollution.diffusion_ratio = 0.04
-        game.map_settings.pollution.min_to_diffuse = 50
-        
+        game.map_settings.pollution.diffusion_ratio = 0.05
+        game.map_settings.pollution.min_to_diffuse = 10
+        game.map_settings.pollution.expected_max_per_chunk = 6000
         self.logger:log("Marathon mod enabled: " .. (self.is_marathon_enabled() and "true" or "false") .. ". RSO mod enabled: " .. (self.is_rso_enabled() and "true" or "false"))
     end
 

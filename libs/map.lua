@@ -5,37 +5,22 @@ Map = {}
 
 function Map.new(logger)
     -- list of regions to scan for biter or spitter spawners. When empty, the map is re-scanned.
-    if not global.regionQueue then
-        global.regionQueue = {}
-    end
+    if not global.regionQueue then global.regionQueue = {} end
     -- list of regions scanned
-    if not global.visitedRegions then
-        global.visitedRegions = {}
-    end
+    if not global.visitedRegions then global.visitedRegions = {} end
     -- list of power lines that may be targeted for a power short
-    if not global.powerLineTargets then
-        global.powerLineTargets = {}
-    end
+    if not global.powerLineTargets then global.powerLineTargets = {} end
     -- list of power short entities and associated entity data
-    if not global.powerShorts then
-        global.powerShorts = {}
-    end
+    if not global.powerShorts then global.powerShorts = {} end
     -- list of regions with biter or spitter spawners in them
-    if not global.enemyRegionQueue then
-        global.enemyRegionQueue = {}
-    end
+    if not global.enemyRegionQueue then global.enemyRegionQueue = {} end
     -- cache of danger value for region areas.
-    if not global.dangerCache then
-        global.dangerCache = {}
-    end
+    if not global.dangerCache then global.dangerCache = {} end
     -- cache of Misanthrope-caused biter attacks for each region
-    if not global.previousBiterAttacks then
-        global.previousBiterAttacks = {}
-    end
+    if not global.previousBiterAttacks then global.previousBiterAttacks = {} end
     -- cache indicates if a region has any entities owned by the player force in them
-    if not global.regionHasAnyTargets then
-        global.regionHasAnyTargets = {}
-    end
+    if not global.regionHasAnyTargets then global.regionHasAnyTargets = {} end
+
     local Map = { l = logger}
 
     function Map:tick()
