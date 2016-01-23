@@ -128,7 +128,7 @@ end
 function Region:getDangerCache()
     local index = bit32.bor(bit32.lshift(self.x, 16), bit32.band(self.y, 0xFFFF))
     local danger_cache = global.dangerCache[index]
-    if danger_cache == nil then
+    if danger_cache == nil or danger_cache.region == nil then
         danger_cache = DangerCache.new(self)
         global.dangerCache[index] = danger_cache:serialize()
     else
@@ -148,7 +148,7 @@ function Region:get_attacked_positions()
     return attacked_positions
 end
 
-function Region:mark_attack_position(pos, logger)
+function Region:mark_attack_position(pos)
     local x = math.floor(pos.x)
     local y = math.floor(pos.y)
     local found = false
@@ -200,6 +200,7 @@ end
 
 -- create region from region coordinates
 function RegionClass.byRegionCoords(regionCoords)
+    if regionCoords == nil then return nil end
     local self = setmetatable({}, Region)
     self.x = math.floor(regionCoords.x)
     self.y = math.floor(regionCoords.y)

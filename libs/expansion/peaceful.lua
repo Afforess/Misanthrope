@@ -1,10 +1,13 @@
 
 local expansion = {  name = "Peaceful",
-    			 color = { r = 0, g = 255, b = 10 },
-    			 max_time = 20 * 60 * 60, 
-    			 min_time = 10 * 60 * 60, 
-    			 min_evo_factor = 0, 
-    			 evo_modifier = 1 }
+        			 color = { r = 0, g = 255, b = 10 },
+        			 max_time = 20 * 60 * 60, 
+        			 min_time = 10 * 60 * 60, 
+        			 min_evo_factor = 0, 
+        			 evo_modifier = 1,
+                     minimum_attack_value = 10000,
+                     min_biter_attack_group = 10,
+                     min_biter_search_distance = 16}
                  
 function expansion:update_expansion_state()
     game.map_settings.enemy_expansion.enabled = false

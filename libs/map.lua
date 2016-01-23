@@ -63,8 +63,10 @@ function Map.new()
     end
 
     function Map:attackTargets(region)
+        local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
+        
         -- setting highest_value > 0 means don't attack if there are only targets with good defenses
-        local highest_value = 10000
+        local highest_value = expansion_phase.minimum_attack_value
         local highest_value_entity = nil
         local any_targets = false
         for entity_name, target_data in pairs(BITER_TARGETS) do
@@ -97,19 +99,21 @@ function Map.new()
         
         if highest_value_entity ~= nil then
             Logger.log("Highest value target: "  .. highest_value_entity.name .. " at position " .. serpent.line(highest_value_entity.position) .. ", with a value of " .. highest_value)
-            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(15, 75) + 10, unit_search_distance = 48 + math.random(64, 128)})
-            region:mark_attack_position(highest_value_entity.position, self.l)
+            local unit_count = expansion_phase.min_biter_attack_group + math.random(expansion_phase.min_biter_attack_group / 2)
+            local search_distance = expansion_phase.min_biter_search_distance + math.random(32, 64)
+            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = unit_count, unit_search_distance = search_distance})
+            region:mark_attack_position(highest_value_entity.position)
 
             return true
         else
-            Logger.log("No valuable targets for " .. region:tostring())
+            Logger.log("No valuable targets for " .. region:tostring() .. ". Minimum value was: " .. highest_value)
             return false
         end
     end
 
     function Map:iterateEnemyRegions()
-        -- check and update enemy regions every 10 s in non-peaceful, and every 60s in peaceful
-        local frequency = 600
+        -- check and update enemy regions every 5 s in non-peaceful, and every 60s in peaceful
+        local frequency = 300
         if global.expansion_state == "Peaceful" then
             frequency = 3600
         end

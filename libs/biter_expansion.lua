@@ -1,13 +1,17 @@
 
 BiterExpansion = {}
 
-local expansion_phases = {}
+expansion_phases = {}
 table.insert(expansion_phases, require('expansion/peaceful'))
 table.insert(expansion_phases, require('expansion/normal'))
 table.insert(expansion_phases, require('expansion/passive'))
 table.insert(expansion_phases, require('expansion/aggressive'))
 table.insert(expansion_phases, require('expansion/assault'))
 table.insert(expansion_phases, require('expansion/beachhead'))
+
+function BiterExpansion.get_expansion_phase(index)
+    return expansion_phases[index]
+end
 
 function BiterExpansion.new()
     local self = { expansion = expansion_phases }
@@ -110,11 +114,20 @@ function BiterExpansion.new()
             if self.is_rso_enabled() then
                 ticks_played = (ticks_played * 2) / 3
             end
+
             -- At 12 hours, the time factor will be at 0.000004 (vanilla value).
             -- after 108 hours of game play, max value of 0.00002 will be reached
-            game.map_settings.enemy_evolution.time_factor = math.min(0.00002, 0.000002 + 0.00000000000077160494 * game.tick)
+            local time_factor = math.min(0.00002, 0.000002 + 0.00000000000077160494 * ticks_played)
             -- after 64 hours of gameplay, max value of 0.000025 will be reached
-            game.map_settings.enemy_evolution.pollution_factor = math.max(0.000025, 0.000005 + 0.0000000000014467593 * game.tick)
+            local pollution_factor = math.max(0.000025, 0.000005 + 0.0000000000014467593 * ticks_played)
+
+            if #global.harpa_list > 0 or #global.idle_harpa_list > 0 then
+                time_factor = (time_factor * 3) / 2
+                pollution_factor = (pollution_factor * 3) / 2
+            end
+
+            game.map_settings.enemy_evolution.time_factor = time_factor
+            game.map_settings.enemy_evolution.pollution_factor = pollution_factor
         else
             game.map_settings.enemy_evolution.time_factor = 0
             game.map_settings.enemy_evolution.pollution_factor = 0
