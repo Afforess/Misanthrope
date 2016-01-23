@@ -6,6 +6,9 @@ function Harpa.register(entity, player_idx)
     if not global.harpa_list then
         global.harpa_list = {}
     end
+    if not global.idle_harpa_list then
+        global.idle_harpa_list = {}
+    end
     if not global.unpowered_harpa_list then
         global.unpowered_harpa_list = {}
     end
@@ -133,20 +136,46 @@ function Harpa.create_overlay_entity(surface, opacity, position, list)
     table.insert(list, overlay_entity)
 end
 
-function Harpa.tick(logger)
+function Harpa.tick()
     if global.harpa_list then
+        if not global.idle_harpa_list then global.idle_harpa_list = {} end
+        
         Harpa.update_overlays()
         
+        -- check idle emitters less often
+        if game.tick % 150 == 0 then
+            for i = #global.idle_harpa_list, 1, -1 do
+                local harpa = global.idle_harpa_list[i]
+                if not harpa.valid then
+                    table.remove(global.idle_harpa_list, i)
+                else
+                    -- validate that emitter is still idle
+                    if not Harpa.is_idle(harpa, 32) then
+                        table.remove(global.idle_harpa_list, i)
+                        table.insert(global.harpa_list, harpa)
+                    end
+                end
+            end
+        end
+
         for i = #global.harpa_list, 1, -1 do
             local harpa = global.harpa_list[i]
             if not harpa.valid then
                 table.remove(global.harpa_list, i)
             else
-                Harpa.tick_emitter(harpa, logger, 30)
+                -- check to see if emitter is idle, and we can update it less often
+                if game.tick % 150 == 0 then
+                    if Harpa.is_idle(harpa, 32) then
+                        table.remove(global.harpa_list, i)
+                        table.insert(global.idle_harpa_list, harpa)
+                    end
+                end  
+          
+                Harpa.tick_emitter(harpa, 30)
             end
         end
     end
-    Harpa.update_power_armor(logger)
+    Harpa.update_power_armor()
 end
 
 function Harpa.has_micro_emitter(player)
@@ -164,13 +193,13 @@ function Harpa.has_micro_emitter(player)
     return false
 end
 
-function Harpa.update_power_armor(logger)
-    -- hack because we can not tell when armor modules change, so check every 5s for players with micro harpa emitter 
-    if game.tick % 300 == 0 then
+function Harpa.update_power_armor()
+    -- hack because we can not tell when armor modules change, so check every 2s for players with micro harpa emitter 
+    if game.tick % 120 == 0 then
         global.micro_harpa_players = {}
         for i = 1, #game.players do
             local player = game.players[i]
-            if Harpa.has_micro_emitter(player) then
+            if Harpa.has_micro_emitter(player) and not Harpa.is_idle(player, 20) then
                 table.insert(global.micro_harpa_players, player)
             end
         end
@@ -179,7 +208,7 @@ function Harpa.update_power_armor(logger)
         for i = #global.micro_harpa_players, 1, -1 do
             local player = global.micro_harpa_players[i]
             if Harpa.has_micro_emitter(player) then
-                Harpa.tick_emitter(player, logger, 16)
+                Harpa.tick_emitter(player, 16)
             else
                 table.remove(global.micro_harpa_players, i)
             end
@@ -218,12 +247,17 @@ function Harpa.area_around(position, distance)
             right_bottom = {x = position.x + distance, y = position.y + distance}}
 end
 
+function Harpa.is_idle(entity, radius)
+    return entity.surface.find_nearest_enemy({position = entity.position, max_distance = radius, force = entity.force}) == nil
+end
+
 -- called every tick... keep it optimized
-function Harpa.tick_emitter(entity, logger, radius)
+function Harpa.tick_emitter(entity, radius)
     -- using x and y and tick for modulus assures emitters next to each other will scan separate rows
     local diameter = radius * 2
     local pos = entity.position
     local surface = entity.surface
+    local force = entity.force
     local row = ((math.floor(pos.y) + math.floor(pos.x) + game.tick) % diameter) - radius
     local area = {left_top = {pos.x - radius, pos.y - row}, right_bottom = {pos.x + radius, pos.y - row + 1}}
     local biters = surface.find_entities_filtered({area = area, type = "unit", force = "enemy"})
@@ -234,10 +268,10 @@ function Harpa.tick_emitter(entity, logger, radius)
         local biter_pos = biter.position
         -- random chance to 1-shot kill a biter (as long as it is not a behemoth)
         if (roll >= 99) and biter.prototype.max_health < 2500 then
-            biter.damage(biter.prototype.max_health, "player")
+            biter.damage(biter.prototype.max_health, force)
         else
             distance = math.sqrt((biter_pos.x - pos.x) * (biter_pos.x - pos.x) + (biter_pos.y - pos.y) * (biter_pos.y - pos.y))
-            biter.damage(math.min(100, biter.prototype.max_health / (1 + distance)), "player")
+            biter.damage(math.min(100, biter.prototype.max_health / (1 + distance)), force)
         end
 
         -- check if biter is valid (damage may have killed it)
@@ -259,7 +293,7 @@ function Harpa.tick_emitter(entity, logger, radius)
                 ignore_time = 60 * 60
             end
             if not pcall(biter.set_command, command) then
-                logger:log("Error executing biter command command: " .. serpent.block(command))
+                Logger.log("Error executing biter command command: " .. serpent.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end
@@ -267,11 +301,11 @@ function Harpa.tick_emitter(entity, logger, radius)
 
     local spawners = surface.find_entities_filtered({area = area, type = "unit-spawner", force = "enemy"})
     for _, spawner in ipairs(spawners) do
-        spawner.damage(spawner.prototype.max_health / 250, "player")
+        spawner.damage(spawner.prototype.max_health / 250, force)
     end
     local worms = surface.find_entities_filtered({area = area, type = "turret", force = "enemy"})
     for _, worm in ipairs(worms) do
-        worm.damage(worm.prototype.max_health / 100, "player")
+        worm.damage(worm.prototype.max_health / 100, force)
     end
 end
 

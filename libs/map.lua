@@ -3,7 +3,7 @@ local Region = require "libs/region"
 
 Map = {}
 
-function Map.new(logger)
+function Map.new()
     -- list of regions to scan for biter or spitter spawners. When empty, the map is re-scanned.
     if not global.regionQueue then global.regionQueue = {} end
     -- list of regions scanned
@@ -17,7 +17,7 @@ function Map.new(logger)
     -- cache indicates if a region has any entities owned by the player force in them
     if not global.regionHasAnyTargets then global.regionHasAnyTargets = {} end
 
-    local Map = { l = logger}
+    local Map = {}
 
     function Map:tick()
         self:iterateMap()
@@ -50,7 +50,7 @@ function Map.new(logger)
     function Map:reset_danger_cache(position)
         local region = Region.new(position)
         region:getDangerCache():reset(true)
-        self.l:log("Reset danger cache for " .. region:tostring())
+        Logger.log("Reset danger cache for " .. region:tostring())
     end
     
     function Map:get_region(position)
@@ -58,7 +58,7 @@ function Map.new(logger)
     end
 
     function Map:updateRegionAI(region)
-        self.l:log("Updating biter AI for " .. region:tostring())
+        Logger.log("Updating biter AI for " .. region:tostring())
         self:attackTargets(region)
     end
 
@@ -73,9 +73,9 @@ function Map.new(logger)
                 any_targets = true
                 -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
                 if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 60 * 3) then
-                    self.l:log(region:tostring() .. " - Danger cache recalculating...")
+                    Logger.log(region:tostring() .. " - Danger cache recalculating...")
                     region:getDangerCache():calculate()
-                    --self.l:log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
+                    --Logger.log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
                 end
                 
                 local value = (target_data.value + math.random(target_data.value)) * 10000
@@ -83,7 +83,7 @@ function Map.new(logger)
                 local attack_count = region:get_count_attack_on_position(targets[i].position)
                 value = value / math.max(1, 1 + defenses)
                 value = value / math.max(1, 1 + attack_count)
-                -- self.l:log("Potential Target: " .. targets[i].name .. " at position " .. self.l:toString(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                -- Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
                 if value > highest_value then
                     highest_value = value
                     highest_value_entity = targets[i]
@@ -96,13 +96,13 @@ function Map.new(logger)
         global.regionHasAnyTargets[index] = any_targets
         
         if highest_value_entity ~= nil then
-            self.l:log("Highest value target: "  .. highest_value_entity.name .. " at position " .. self.l:toString(highest_value_entity.position) .. ", with a value of " .. highest_value)
+            Logger.log("Highest value target: "  .. highest_value_entity.name .. " at position " .. serpent.line(highest_value_entity.position) .. ", with a value of " .. highest_value)
             highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = math.random(15, 75) + 10, unit_search_distance = 48 + math.random(64, 128)})
             region:mark_attack_position(highest_value_entity.position, self.l)
 
             return true
         else
-            self.l:log("No valuable targets for " .. region:tostring())
+            Logger.log("No valuable targets for " .. region:tostring())
             return false
         end
     end
@@ -116,7 +116,7 @@ function Map.new(logger)
 
     	if (game.tick % frequency == 0) then
     		if #global.enemyRegionQueue == 0 then
-    			self.l:log("No enemy regions found.")
+    			Logger.log("No enemy regions found.")
     		else
                 for i = 1, 5 do
                     local enemyRegionCoords = table.remove(global.enemyRegionQueue, 1)
@@ -125,7 +125,7 @@ function Map.new(logger)
                     local index = bit32.bor(bit32.lshift(enemyRegionCoords.x, 16), bit32.band(enemyRegionCoords.y, 0xFFFF))
                     local any_targets = global.regionHasAnyTargets[index] or global.regionHasAnyTargets[index] == nil
                     if not any_targets then
-                        self.l:log("No targets available (cache: " .. index .. ") in " .. enemyRegion:tostring())
+                        Logger.log("No targets available (cache: " .. index .. ") in " .. enemyRegion:tostring())
                     end
                     
         			if any_targets and #enemyRegion:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
@@ -152,7 +152,7 @@ function Map.new(logger)
     end
 
     function Map:seedInitialQueue()
-        self.l:log("Seeding initial region queue")
+        Logger.log("Seeding initial region queue")
 
     	-- reset lists
     	global.visitedRegions = {}

@@ -9,8 +9,8 @@ table.insert(expansion_phases, require('expansion/aggressive'))
 table.insert(expansion_phases, require('expansion/assault'))
 table.insert(expansion_phases, require('expansion/beachhead'))
 
-function BiterExpansion.new(logger)
-    local self = { expansion = expansion_phases, logger = logger }
+function BiterExpansion.new()
+    local self = { expansion = expansion_phases }
     for i = 1, #self.expansion do
         self.expansion[i]["index"] = i
     end
@@ -57,7 +57,7 @@ function BiterExpansion.new(logger)
             for i = #self.expansion, 1, -1 do
                 if game.evolution_factor > self.expansion[i].min_evo_factor then
                     global.expansion_target_index = i
-                    self.logger:log("Setting expansion target index to " .. i)
+                    Logger.log("Setting expansion target index to " .. i)
                     break
                 end
             end
@@ -76,15 +76,15 @@ function BiterExpansion.new(logger)
     end
 
     function self:set_expansion_state(state)
-        self.logger:log("Setting expansion state to: " .. state.name)
-        self.logger:log("Max Expansion state time " .. state.max_time)
-        self.logger:log("Min Expansion state time " .. state.min_time)
+        Logger.log("Setting expansion state to: " .. state.name)
+        Logger.log("Max Expansion state time " .. state.max_time)
+        Logger.log("Min Expansion state time " .. state.min_time)
 
         global.expansion_timer = math.random(state.min_time, state.max_time)
-        self.logger:log("Setting expansion timer to: " .. global.expansion_timer)
+        Logger.log("Setting expansion timer to: " .. global.expansion_timer)
 
         global.evo_factor = ((1 - state.evo_modifier) * game.evolution_factor) / global.expansion_timer
-        self.logger:log("Setting evo factor to: " .. global.evo_factor)
+        Logger.log("Setting evo factor to: " .. global.evo_factor)
 
         global.expansion_index = state.index
         global.expansion_state = state.name
@@ -97,7 +97,7 @@ function BiterExpansion.new(logger)
         game.map_settings.pollution.diffusion_ratio = 0.05
         game.map_settings.pollution.min_to_diffuse = 10
         game.map_settings.pollution.expected_max_per_chunk = 6000
-        self.logger:log("Marathon mod enabled: " .. (self.is_marathon_enabled() and "true" or "false") .. ". RSO mod enabled: " .. (self.is_rso_enabled() and "true" or "false"))
+        Logger.log("Marathon mod enabled: " .. (self.is_marathon_enabled() and "true" or "false") .. ". RSO mod enabled: " .. (self.is_rso_enabled() and "true" or "false"))
     end
 
     function self:update_expansion_factors(state)

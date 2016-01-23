@@ -1,13 +1,11 @@
 require "defines"
 require "util"
+require 'libs/logger'
 require 'remote'
 require 'libs/EvoGUI'
 require 'libs/map'
 require 'libs/biter_expansion'
 local Harpa = require "libs/harpa"
-
-local logger = require 'libs/logger'
-local l = logger.new_logger("main")
 
 local map = nil
 local biter_expansion = nil
@@ -32,7 +30,7 @@ script.on_event(defines.events.on_tick, function(event)
 	map:tick()
 	biter_expansion:tick()
 	evo_gui:tick()
-	Harpa.tick(l)
+	Harpa.tick()
 end)
 
 -- Strip backer names from HARPA emitters
@@ -73,7 +71,7 @@ function update_regional_targets(entity)
 		local region = map:get_region(entity.position)
 		local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
 		if not global.regionHasAnyTargets[index] then
-			l:log(region:tostring() .. " has available targets, cache cleared.")
+			Logger.log(region:tostring() .. " has available targets, cache cleared.")
 		end
 		global.regionHasAnyTargets[index] = true
 	end
