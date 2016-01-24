@@ -122,10 +122,12 @@ function Map.new()
     		if #global.enemyRegionQueue == 0 then
     			Logger.log("No enemy regions found.")
     		else
-                for i = 1, 5 do
+                local iterations = math.min(5, #global.enemyRegionQueue)
+                for i = 1, iterations do
                     local enemyRegionCoords = table.remove(global.enemyRegionQueue, 1)
-                    local enemyRegion = Region.byRegionCoords(enemyRegionCoords)
+                    if enemyRegionCoords == nil then break end
                     
+                    local enemyRegion = Region.byRegionCoords(enemyRegionCoords)
                     local index = bit32.bor(bit32.lshift(enemyRegionCoords.x, 16), bit32.band(enemyRegionCoords.y, 0xFFFF))
                     local any_targets = global.regionHasAnyTargets[index] or global.regionHasAnyTargets[index] == nil
                     if not any_targets then
