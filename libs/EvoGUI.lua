@@ -6,7 +6,14 @@ function EvoGUI.new(expansion_phases)
 
     function EvoGUI:createEvolutionRateText()
         local diff = game.evolution_factor - global.exponential_moving_average
-        local text = math.abs(math.floor(diff) * 100 * 60) .. "." .. math.floor(diff * 1000 * 100 * 60)
+        -- percentage is decimal * 100, * 60 for per minute value
+        local evo_rate_per_min = math.abs(diff * 100 * 60)
+        
+        -- this nonsense is because string.format(%.3f) is not safe in MP across platforms, but integer math is
+        local whole_number = math.floor(evo_rate_per_min)
+        local fractional_component = math.floor((evo_rate_per_min - whole_number) * 1000)
+        Logger.log("Diff: " .. diff .. " First Num: " .. whole_number .. " Second Num: " .. fractional_component)
+        local text = whole_number .. "." .. fractional_component
         if diff > 0 then
             return "Evolution Rate: +" .. text .. "% / min"
         else
@@ -61,9 +68,11 @@ function EvoGUI.new(expansion_phases)
         if not global.evo_gui.detected then
             self:setup()
         end
-        if global.evo_gui.detected and game.tick % 60 == 0 then
+        if global.evo_gui.detected and game.tick % 3 == 0 then
             self:updateGUI()
-            global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+            if game.tick % 60 == 0 then
+                global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+            end
         end
     end
 
