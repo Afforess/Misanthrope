@@ -2,35 +2,15 @@
 EvoGUI = {}
 
 function EvoGUI.new(expansion_phases)
-    local EvoGUI = { expansion_phases = expansion_phases, detected = false }
-
-    if not global.exponential_moving_average then
-        global.exponential_moving_average = game.evolution_factor
-    end
-
-    if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
-        EvoGUI.detected = true
-
-        remote.call("EvoGUI", "create_remote_sensor", {
-            mod_name = "Misanthrope",
-            name = "evolution_state",
-            text = "Evolution State:",
-            caption = "Evolution State"
-        })
-        remote.call("EvoGUI", "create_remote_sensor", {
-            mod_name = "Misanthrope",
-            name = "evolution_rate",
-            text = "Evolution Rate:",
-            caption = "Evolution Rate"
-        })
-    end
+    local EvoGUI = { expansion_phases = expansion_phases}
 
     function EvoGUI:createEvolutionRateText()
         local diff = game.evolution_factor - global.exponential_moving_average
+        local text = math.abs(math.floor(diff) * 100 * 60) .. "." .. math.floor(diff * 1000 * 100 * 60)
         if diff > 0 then
-            return "Evolution Rate: +" .. string.format("%.3f", diff * 100 * 60 ) .. "% / min"
+            return "Evolution Rate: +" .. text .. "% / min"
         else
-            return "Evolution Rate: -" .. string.format("%.3f", math.abs(diff * 100 * 60)) .. "% / min"
+            return "Evolution Rate: -" .. text .. "% / min"
         end
     end
 
@@ -51,23 +31,46 @@ function EvoGUI.new(expansion_phases)
         text = text .. " ( " .. math.floor(global.expansion_timer / 60) .. "s )"
         return text
     end
+    
+    function EvoGUI:setup()
+        if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
+            global.evo_gui.detected = true
+
+            remote.call("EvoGUI", "create_remote_sensor", {
+                mod_name = "Misanthrope",
+                name = "evolution_state",
+                text = "Evolution State:",
+                caption = "Evolution State"
+            })
+            remote.call("EvoGUI", "create_remote_sensor", {
+                mod_name = "Misanthrope",
+                name = "evolution_rate",
+                text = "Evolution Rate:",
+                caption = "Evolution Rate"
+            })
+            self:updateGUI()
+        end
+    end
 
     function EvoGUI:tick()
-        if self.detected and game.tick % 60 == 0 then
+        if not global.evo_gui then global.evo_gui = {} end
+        if not global.exponential_moving_average then
+            global.exponential_moving_average = game.evolution_factor
+        end
+
+        if not global.evo_gui.detected then
+            self:setup()
+        end
+        if global.evo_gui.detected and game.tick % 60 == 0 then
             self:updateGUI()
             global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
         end
     end
-    
+
     function EvoGUI:updateGUI()
         local expansion_data = self.expansion_phases[global.expansion_index]
-
         remote.call("EvoGUI", "update_remote_sensor", "evolution_state", self:createEvolutionText(), expansion_data.color)
         remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", self:createEvolutionRateText(), self:calculateEvolutionRateColor())
-    end
-    
-    if EvoGUI.detected then
-        EvoGUI:updateGUI()
     end
 
     return EvoGUI
