@@ -10,4 +10,4 @@ deployment:
     release-candidate:
         branch: master
         commands:
-            - mv pkg/*.zip $CIRCLE_ARTIFACTS
+            - mv build/*.zip $CIRCLE_ARTIFACTS
