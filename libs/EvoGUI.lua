@@ -12,7 +12,6 @@ function EvoGUI.new(expansion_phases)
         -- this nonsense is because string.format(%.3f) is not safe in MP across platforms, but integer math is
         local whole_number = math.floor(evo_rate_per_min)
         local fractional_component = math.floor((evo_rate_per_min - whole_number) * 1000)
-        Logger.log("Diff: " .. diff .. " First Num: " .. whole_number .. " Second Num: " .. fractional_component)
         local text = whole_number .. "." .. fractional_component
         if diff > 0 then
             return "Evolution Rate: +" .. text .. "% / min"
