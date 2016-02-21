@@ -2,7 +2,7 @@ require "defines"
 
 Harpa = {}
 
-function Harpa.register(entity, player_idx)
+function Harpa.setup()
     if not global.harpa_list then
         global.harpa_list = {}
     end
@@ -18,7 +18,10 @@ function Harpa.register(entity, player_idx)
     if not global.harpa_overlays then
         global.harpa_overlays = {}
     end
+end
 
+function Harpa.register(entity, player_idx)
+    Harpa.setup()
     if Harpa.is_powered(entity, nil) then
         if player_idx then
             Harpa.create_overlay(entity, player_idx)
@@ -139,7 +142,7 @@ end
 function Harpa.tick()
     if global.harpa_list then
         if not global.idle_harpa_list then global.idle_harpa_list = {} end
-        
+        Harpa.setup()
         Harpa.update_overlays()
         
         -- check idle emitters less often
@@ -209,6 +212,7 @@ function Harpa.update_power_armor()
         for i = 1, #game.players do
             local player = game.players[i]
             if Harpa.has_micro_emitter(player) and not Harpa.is_idle(player, 20) then
+                Harpa.setup()
                 table.insert(global.micro_harpa_players, player)
             end
         end
@@ -217,6 +221,7 @@ function Harpa.update_power_armor()
         for i = #global.micro_harpa_players, 1, -1 do
             local player = global.micro_harpa_players[i]
             if Harpa.has_micro_emitter(player) then
+                Harpa.setup()
                 Harpa.tick_emitter(player, 16)
             else
                 table.remove(global.micro_harpa_players, i)
@@ -319,12 +324,14 @@ function Harpa.tick_emitter(entity, radius)
 end
 
 function Harpa.ignore_biter(entity)
-    for i = #global.biter_ignore_list, 1, -1 do
-        local biter_data = global.biter_ignore_list[i]
-        if not biter_data.biter.valid or game.tick > biter_data.until_tick then
-            table.remove(global.biter_ignore_list, i)
-        elseif biter_data.biter == entity then
-            return true
+    if global.biter_ignore_list then
+        for i = #global.biter_ignore_list, 1, -1 do
+            local biter_data = global.biter_ignore_list[i]
+            if not biter_data.biter.valid or game.tick > biter_data.until_tick then
+                table.remove(global.biter_ignore_list, i)
+            elseif biter_data.biter == entity then
+                return true
+            end
         end
     end
     return false
