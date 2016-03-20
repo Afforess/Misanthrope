@@ -16,7 +16,9 @@ function Map.new()
     if not global.previousBiterAttacks then global.previousBiterAttacks = {} end
     -- cache indicates if a region has any entities owned by the player force in them
     if not global.regionHasAnyTargets then global.regionHasAnyTargets = {} end
-
+    global.enemyRegions = nil
+    global.powerShorts = nil
+    global.powerLineTargets = nil
     local Map = {}
 
     function Map:tick()
@@ -49,8 +51,8 @@ function Map.new()
     
     function Map:reset_danger_cache(position)
         local region = Region.new(position)
-        region:getDangerCache():reset(true)
-        Logger.log("Reset danger cache for " .. region:tostring())
+        region:deleteDangerCache()
+        Logger.log("Deleted danger cache for " .. region:tostring())
     end
     
     function Map:get_region(position)

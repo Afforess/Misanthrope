@@ -137,6 +137,11 @@ function Region:getDangerCache()
     return danger_cache
 end
 
+function Region:deleteDangerCache()
+    local index = bit32.bor(bit32.lshift(self.x, 16), bit32.band(self.y, 0xFFFF))
+    global.dangerCache[index] = nil
+end
+
 -- locations biters have been previously assigned to attack
 function Region:get_attacked_positions()
     local index = bit32.bor(bit32.lshift(self.x, 16), bit32.band(self.y, 0xFFFF))

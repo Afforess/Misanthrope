@@ -4,6 +4,7 @@ data:extend(
         type = "recipe",
         name = "biter-emitter",
         energy_required = 6,
+        enabled = false,
         ingredients =
         {
             {"iron-gear-wheel", 5},
@@ -16,6 +17,7 @@ data:extend(
         type = "recipe",
         name = "micro-biter-emitter",
         energy_required = 2,
+        enabled = false,
         ingredients =
         {
             {"biter-emitter", 1},
