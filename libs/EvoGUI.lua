@@ -14,9 +14,9 @@ function EvoGUI.new(expansion_phases)
         local fractional_component = math.floor((evo_rate_per_min - whole_number) * 1000)
         local text = string.format("%d.%04d%%", whole_number, fractional_component)
         if diff > 0 then
-            return "Evolution Rate: +" .. text .. "% / min"
+            return "Evolution Rate: +" .. text .. " / min"
         else
-            return "Evolution Rate: -" .. text .. "% / min"
+            return "Evolution Rate: -" .. text .. " / min"
         end
     end
 

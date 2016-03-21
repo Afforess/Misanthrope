@@ -15,10 +15,11 @@ function Map.new()
     -- cache of Misanthrope-caused biter attacks for each region
     if not global.previousBiterAttacks then global.previousBiterAttacks = {} end
     -- cache indicates if a region has any entities owned by the player force in them
-    if not global.regionHasAnyTargets then global.regionHasAnyTargets = {} end
+    if not global.region_has_any_targets then global.region_has_any_targets = {} end
     global.enemyRegions = nil
     global.powerShorts = nil
     global.powerLineTargets = nil
+    global.regionHasAnyTargets = nil
     local Map = {}
 
     function Map:tick()
@@ -29,25 +30,25 @@ function Map.new()
     BITER_TARGETS = {}
     BITER_TARGETS["big-electric-pole"] = {value = 1000}
     BITER_TARGETS["straight_rail"] = {value = 750}
-    BITER_TARGETS["curved_rail"] = {value= 750}
-    BITER_TARGETS["medium-electric-pole"] = {value= 250}
-    BITER_TARGETS["small-electric-pole"] = {value= 150}
+    BITER_TARGETS["curved_rail"] = {value = 750}
+    BITER_TARGETS["medium-electric-pole"] = {value = 250}
+    BITER_TARGETS["small-electric-pole"] = {value = 150}
 
-    BITER_TARGETS["rail-signal"] = {value= 500}
-    BITER_TARGETS["rail-chain-signal"] = {value= 750}
+    BITER_TARGETS["rail-signal"] = {value = 500}
+    BITER_TARGETS["rail-chain-signal"] = {value = 750}
 
-    BITER_TARGETS["roboport"] = {value= 500}
-    BITER_TARGETS["roboportmk2"] = {value= 750}
+    BITER_TARGETS["roboport"] = {value = 500}
+    BITER_TARGETS["roboportmk2"] = {value = 750}
 
-    BITER_TARGETS["pipe-to-ground"] = {value= 75}
-    BITER_TARGETS["pipe"] = {value= 15}
+    BITER_TARGETS["pipe-to-ground"] = {value = 75}
+    BITER_TARGETS["pipe"] = {value = 15}
 
-    BITER_TARGETS["express-transport-belt-to-ground"] = {value= 80}
-    BITER_TARGETS["fast-transport-belt-to-ground"] = {value= 50}
-    BITER_TARGETS["basic-transport-belt-to-ground"] = {value= 30}
+    BITER_TARGETS["express-transport-belt-to-ground"] = {value = 80}
+    BITER_TARGETS["fast-transport-belt-to-ground"] = {value = 50}
+    BITER_TARGETS["basic-transport-belt-to-ground"] = {value = 30}
 
-    BITER_TARGETS["offshore-pump"] = {value= 150}
-    BITER_TARGETS["storage-tank"] = {value= 50}
+    BITER_TARGETS["offshore-pump"] = {value = 150}
+    BITER_TARGETS["storage-tank"] = {value = 50}
     
     function Map:reset_danger_cache(position)
         local region = Region.new(position)
@@ -72,7 +73,7 @@ function Map.new()
         local highest_value_entity = nil
         local any_targets = false
         for entity_name, target_data in pairs(BITER_TARGETS) do
-            local targets = region:findEntities({entity_name})
+            local targets = region:find_entities({entity_name}, 256)
             for i = 1, #targets do
                 any_targets = true
                 -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
@@ -87,7 +88,7 @@ function Map.new()
                 local attack_count = region:get_count_attack_on_position(targets[i].position)
                 value = value / math.max(1, 1 + defenses)
                 value = value / math.max(1, 1 + attack_count)
-                -- Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
                 if value > highest_value then
                     highest_value = value
                     highest_value_entity = targets[i]
@@ -97,7 +98,7 @@ function Map.new()
         
         -- cache whether any player-made structures exist in the region, don't bother attacking again until it does
         local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
-        global.regionHasAnyTargets[index] = any_targets
+        global.region_has_any_targets[index] = any_targets
         
         if highest_value_entity ~= nil then
             Logger.log("Highest value target: "  .. highest_value_entity.name .. " at position " .. serpent.line(highest_value_entity.position) .. ", with a value of " .. highest_value)
@@ -131,12 +132,12 @@ function Map.new()
                     
                     local enemyRegion = Region.byRegionCoords(enemyRegionCoords)
                     local index = bit32.bor(bit32.lshift(enemyRegionCoords.x, 16), bit32.band(enemyRegionCoords.y, 0xFFFF))
-                    local any_targets = global.regionHasAnyTargets[index] or global.regionHasAnyTargets[index] == nil
+                    local any_targets = global.region_has_any_targets[index] or global.region_has_any_targets[index] == nil
                     if not any_targets then
                         Logger.log("No targets available (cache: " .. index .. ") in " .. enemyRegion:tostring())
                     end
                     
-        			if any_targets and #enemyRegion:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
+        			if any_targets and #enemyRegion:find_entities({"biter-spawner", "spitter-spawner"}, 0) > 0 then
                         global.enemyRegionQueue[#global.enemyRegionQueue + 1] = enemyRegionCoords
 
                         if global.expansion_state ~= "Peaceful" then
@@ -153,7 +154,7 @@ function Map.new()
     	if (game.tick % 120 == 0) then
     		local region = self:nextRegion()
 
-    		if not self:isEnemyRegion(region) and #region:findEntities({"biter-spawner", "spitter-spawner"}) > 0 then
+    		if not self:isEnemyRegion(region) and #region:find_entities({"biter-spawner", "spitter-spawner"}, 0) > 0 then
     			global.enemyRegionQueue[#global.enemyRegionQueue + 1] = {x = region:getX(), y = region:getY()}
     		end
     	end

@@ -29,12 +29,12 @@ function DangerCache:calculate()
     self:reset(false)
     self.calculated_at = game.tick
     
-    local area = self.region:regionArea()
+    local area = self.region:region_area(0)
     -- examine area +/- 25 blocks around edge of area, turrets may be slightly outside region
-    area.lefttop.x = area.lefttop.x - 25
-    area.lefttop.y = area.lefttop.y - 25
-    area.rightbottom.x = area.rightbottom.x + 25
-    area.rightbottom.y = area.rightbottom.y + 25
+    area.left_top.x = area.left_top.x - 25
+    area.left_top.y = area.left_top.y - 25
+    area.right_bottom.x = area.right_bottom.x + 25
+    area.right_bottom.y = area.right_bottom.y + 25
     
     local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
     local turret_defense_value = {2000, 100, 600, 300}

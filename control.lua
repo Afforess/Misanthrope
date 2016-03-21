@@ -70,10 +70,10 @@ function update_regional_targets(entity)
 	if entity.force.name == "player" then
 		local region = map:get_region(entity.position)
 		local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
-		if not global.regionHasAnyTargets[index] then
+		if not global.region_has_any_targets[index] then
 			Logger.log(region:tostring() .. " has available targets, cache cleared.")
 		end
-		global.regionHasAnyTargets[index] = true
+		global.region_has_any_targets[index] = true
 	end
 end
 

@@ -106,19 +106,19 @@ function Region:isPartiallyCharted()
     return false
 end
 
-function Region:findEntities(nameList)
-    local entityList = {}
+function Region:find_entities(names, extra_radius)
+    local list = {}
     local surface = game.surfaces.nauvis
-    local region_area = self:regionArea()
-    for i=1, #nameList do
-        local temp = surface.find_entities_filtered({area = region_area, name = nameList[i]})
-        entityList = mergeTables(entityList, temp)
+    local region_area = self:region_area(extra_radius)
+    for i = 1, #names do
+        local temp = surface.find_entities_filtered({area = region_area, name = names[i]})
+        list = mergeTables(list, temp)
     end
-    return entityList
+    return list
 end
 
-function Region:regionArea()
-	return {lefttop = {x = self:getLowerXPos(), y = self:getLowerYPos()}, rightbottom = {x = self:getUpperXPos(), y = self:getUpperYPos()}}
+function Region:region_area(extra_radius)
+	return {left_top = {x = self:getLowerXPos() - extra_radius, y = self:getLowerYPos() - extra_radius}, right_bottom = {x = self:getUpperXPos() + extra_radius, y = self:getUpperYPos() + extra_radius}}
 end
 
 function Region:offset(dx, dy)

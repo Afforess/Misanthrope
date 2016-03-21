@@ -4,10 +4,10 @@ local expansion = { name = "Aggressive Expansion",
 				    max_time = 7 * 60 * 60, 
 				    min_time = 4 * 60 * 60, 
 				    min_evo_factor = 0.50, 
-				    evo_modifier = 0.9,
-					minimum_attack_value = 5,
+				    evo_modifier = 0.96,
+					minimum_attack_value = 0,
 					min_biter_attack_group = 50,
-					min_biter_search_distance = 64}
+					min_biter_search_distance = 96}
 
 function expansion:update_expansion_state()
 	game.map_settings.enemy_expansion.enabled = true

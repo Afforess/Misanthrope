@@ -4,10 +4,10 @@ local expansion = { name = "Beachhead",
 				   max_time = 5 * 60 * 60,
 				   min_time = 4 * 60 * 60, 
 				   min_evo_factor = 0.85, 
-				   evo_modifier = 0.75,
-				   minimum_attack_value = 1,
+				   evo_modifier = 0.85,
+				   minimum_attack_value = 0,
 				   min_biter_attack_group = 50,
-				   min_biter_search_distance = 72}
+				   min_biter_search_distance = 172}
 
 function expansion:update_expansion_state()
 	game.map_settings.enemy_expansion.enabled = true
