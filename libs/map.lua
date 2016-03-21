@@ -29,8 +29,8 @@ function Map.new()
 
     BITER_TARGETS = {}
     BITER_TARGETS["big-electric-pole"] = {value = 1000}
-    BITER_TARGETS["straight_rail"] = {value = 750}
-    BITER_TARGETS["curved_rail"] = {value = 750}
+    BITER_TARGETS["straight-rail"] = {value = 750}
+    BITER_TARGETS["curved-rail"] = {value = 750}
     BITER_TARGETS["medium-electric-pole"] = {value = 250}
     BITER_TARGETS["small-electric-pole"] = {value = 150}
 
@@ -72,26 +72,30 @@ function Map.new()
         local highest_value = expansion_phase.minimum_attack_value
         local highest_value_entity = nil
         local any_targets = false
+        local enemy_force = game.forces.enemy
+        local neutral_force = game.forces.neutral
         for entity_name, target_data in pairs(BITER_TARGETS) do
             local targets = region:find_entities({entity_name}, 256)
             for i = 1, #targets do
-                any_targets = true
-                -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
-                if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 60 * 3) then
-                    Logger.log(region:tostring() .. " - Danger cache recalculating...")
-                    region:getDangerCache():calculate()
-                    --Logger.log(region:tostring() .. " - Danger cache calculated: " .. region:getDangerCache():tostring())
-                end
-                
-                local value = (target_data.value + math.random(target_data.value)) * 10000
-                local defenses = region:getDangerCache():getDanger(targets[i].position)
-                local attack_count = region:get_count_attack_on_position(targets[i].position)
-                value = value / math.max(1, 1 + defenses)
-                value = value / math.max(1, 1 + attack_count)
-                Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
-                if value > highest_value then
-                    highest_value = value
-                    highest_value_entity = targets[i]
+                local force = targets[i].force
+                if force ~= enemy_force and force ~= neutral_force then
+                    any_targets = true
+                    -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
+                    if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 60 * 3) then
+                        Logger.log(region:tostring() .. " - Danger cache recalculating...")
+                        region:getDangerCache():calculate()
+                    end
+                    
+                    local value = (target_data.value + math.random(target_data.value)) * 10000
+                    local defenses = region:getDangerCache():getDanger(targets[i].position)
+                    local attack_count = region:get_count_attack_on_position(targets[i].position)
+                    value = value / math.max(1, 1 + defenses)
+                    value = value / math.max(1, 1 + attack_count)
+                    -- Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                    if value > highest_value then
+                        highest_value = value
+                        highest_value_entity = targets[i]
+                    end
                 end
             end
         end
