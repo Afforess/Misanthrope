@@ -67,23 +67,22 @@ script.on_event(defines.events.on_player_mined_item, function(event)
 end)
 
 function update_regional_targets(entity)
-	if entity.force.name == "player" then
-		local region = map:get_region(entity.position)
-		local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
-		if not global.region_has_any_targets[index] then
-			Logger.log(region:tostring() .. " has available targets, cache cleared.")
+	if entity.force ~= game.forces.enemy and entity.force ~= game.forces.neutral then
+		local region_data = region.lookup_region_from_position(entity.surface, entity.position)
+		if not region_data.any_targets then
+			Logger.log(region.tostring(region_data) .. " has available targets, cache cleared.")
 		end
-		global.region_has_any_targets[index] = true
+		region_data.any_targets = false
 	end
 end
 
 function update_danger_cache(entity)
-	if entity.force.name == "player" then
-		local region = map:get_region(entity.position)
+	if entity.force ~= game.forces.enemy and entity.force ~= game.forces.neutral then
+		local region_data = region.lookup_region_from_position(entity.surface, entity.position)
 		local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
 		for i = 1, #turret_names do
 			if entity.name == turret_names[i] then
-				map:reset_danger_cache(entity.position)
+				region_data.danger_cache = nil
 				return true
 			end
 		end
@@ -95,13 +94,4 @@ function check_power(entity, ignore_entity)
 	if entity.prototype.type == "electric-pole" then
 		Harpa.update_power_grid(entity.position, 10, ignore_entity)
 	end
-end
-
-function mergeTables(table1, table2)
-	newTable = table1
-	for i=1, #table2
-	do
-		table.insert(newTable, table2[i])
-	end
-	return newTable
 end

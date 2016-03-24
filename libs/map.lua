@@ -1,124 +1,98 @@
-require "defines"
-local Region = require "libs/region"
+require "libs/region"
+require "libs/biter_targets"
 
 Map = {}
 
 function Map.new()
+    -- table with all regions
+    if not global.regions then global.regions = {} end
     -- list of regions to scan for biter or spitter spawners. When empty, the map is re-scanned.
-    if not global.regionQueue then global.regionQueue = {} end
+    if not global.region_queue then global.region_queue = {} end
     -- list of regions scanned
-    if not global.visitedRegions then global.visitedRegions = {} end
+    if not global.visited_regions then global.visited_regions = {} end
     -- list of regions with biter or spitter spawners in them
-    if not global.enemyRegionQueue then global.enemyRegionQueue = {} end
-    -- cache of danger value for region areas.
-    if not global.dangerCache then global.dangerCache = {} end
-    -- cache of Misanthrope-caused biter attacks for each region
-    if not global.previousBiterAttacks then global.previousBiterAttacks = {} end
-    -- cache indicates if a region has any entities owned by the player force in them
-    if not global.region_has_any_targets then global.region_has_any_targets = {} end
+    if not global.enemy_regions then global.enemy_regions = {} end
     global.enemyRegions = nil
     global.powerShorts = nil
     global.powerLineTargets = nil
     global.regionHasAnyTargets = nil
+    global.region_has_any_targets = nil
+    global.dangerCache = nil
+    global.previousBiterAttacks = nil
+    global.regionQueue = nil
+    global.visitedRegions = nil
+    global.enemyRegionQueue = nil
     local Map = {}
 
     function Map:tick()
-        self:iterateMap()
-        self:iterateEnemyRegions()
+        self:iterate_map()
+        self:iterate_enemy_regions()
     end
 
-    BITER_TARGETS = {}
-    BITER_TARGETS["big-electric-pole"] = {value = 1000}
-    BITER_TARGETS["straight-rail"] = {value = 750}
-    BITER_TARGETS["curved-rail"] = {value = 750}
-    BITER_TARGETS["medium-electric-pole"] = {value = 250}
-    BITER_TARGETS["small-electric-pole"] = {value = 150}
-
-    BITER_TARGETS["rail-signal"] = {value = 500}
-    BITER_TARGETS["rail-chain-signal"] = {value = 750}
-
-    BITER_TARGETS["roboport"] = {value = 500}
-    BITER_TARGETS["roboportmk2"] = {value = 750}
-
-    BITER_TARGETS["pipe-to-ground"] = {value = 75}
-    BITER_TARGETS["pipe"] = {value = 15}
-
-    BITER_TARGETS["express-transport-belt-to-ground"] = {value = 80}
-    BITER_TARGETS["fast-transport-belt-to-ground"] = {value = 50}
-    BITER_TARGETS["basic-transport-belt-to-ground"] = {value = 30}
-
-    BITER_TARGETS["offshore-pump"] = {value = 150}
-    BITER_TARGETS["storage-tank"] = {value = 50}
-    
-    function Map:reset_danger_cache(position)
-        local region = Region.new(position)
-        region:deleteDangerCache()
-        Logger.log("Deleted danger cache for " .. region:tostring())
-    end
-    
-    function Map:get_region(position)
-        return Region.new(position)
+    function Map:update_region_ai(region_data)
+        if region.any_potential_targets(region_data, 1) then
+            Logger.log("Updating biter AI for " .. region.tostring(region_data))
+            self:attack_targets(region_data)
+            return true
+        end
+        return false
     end
 
-    function Map:updateRegionAI(region)
-        Logger.log("Updating biter AI for " .. region:tostring())
-        self:attackTargets(region)
-    end
-
-    function Map:attackTargets(region)
+    function Map:attack_targets(region_data)
         local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
-        
+
         -- setting highest_value > 0 means don't attack if there are only targets with good defenses
         local highest_value = expansion_phase.minimum_attack_value
         local highest_value_entity = nil
         local any_targets = false
         local enemy_force = game.forces.enemy
         local neutral_force = game.forces.neutral
-        for entity_name, target_data in pairs(BITER_TARGETS) do
-            local targets = region:find_entities({entity_name}, 256)
-            for i = 1, #targets do
-                local force = targets[i].force
-                if force ~= enemy_force and force ~= neutral_force then
-                    any_targets = true
-                    -- danger cache invalidates after 3 hours (or manual invalidation by turrent placement)
-                    if region:getDangerCache():calculatedAt() == -1 or (game.tick - region:getDangerCache():calculatedAt()) > (60 * 60 * 60 * 3) then
-                        Logger.log(region:tostring() .. " - Danger cache recalculating...")
-                        region:getDangerCache():calculate()
-                    end
-                    
-                    local value = (target_data.value + math.random(target_data.value)) * 10000
-                    local defenses = region:getDangerCache():getDanger(targets[i].position)
-                    local attack_count = region:get_count_attack_on_position(targets[i].position)
-                    value = value / math.max(1, 1 + defenses)
-                    value = value / math.max(1, 1 + attack_count)
-                    -- Logger.log("Potential Target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
-                    if value > highest_value then
-                        highest_value = value
-                        highest_value_entity = targets[i]
+        local search_distance = expansion_phase.min_biter_search_distance + math.random(32, 64)
+        local surface = region.get_surface(region_data)
+
+        for _, biter_base in pairs(region_data.enemy_bases) do
+            local search_area = {left_top =     {x = biter_base.position.x - search_distance, y = biter_base.position.y - search_distance},
+                                 right_bottom = {x = biter_base.position.y + search_distance, y = biter_base.position.y + search_distance}}
+            
+            for entity_name, target_data in pairs(BITER_TARGETS) do
+                local targets = surface.find_entities_filtered({area = search_area, name = entity_name})
+                for i = 1, #targets do
+                    local force = targets[i].force
+                    if force ~= enemy_force and force ~= neutral_force then
+                        any_targets = true
+
+                        local value = (target_data.value + math.random(target_data.value)) * 10000 * biter_base.count
+                        local defenses = region.get_danger_at(region_data, targets[i].position) * target_data.danger_modifier
+                        local attack_count = region.count_attacks_on_position(region_data, targets[i].position)
+                        value = value / math.max(1, 1 + defenses)
+                        value = value / math.max(1, 1 + attack_count)
+                        -- Logger.log("Biter base (" .. serpent.line(biter_base) .. ") found potential target: " .. targets[i].name .. " at position " .. serpent.line(targets[i].position) .. "\n\t\tBase value: " .. target_data.value .. ". Defense level: " .. defenses .. ". Attack count: " .. attack_count .. ". Calculated value: " .. value .. ". Highest value: " .. highest_value)
+                        if value > highest_value then
+                            highest_value = value
+                            highest_value_entity = targets[i]
+                        end
                     end
                 end
             end
         end
-        
+
         -- cache whether any player-made structures exist in the region, don't bother attacking again until it does
-        local index = bit32.bor(bit32.lshift(region:getX(), 16), bit32.band(region:getY(), 0xFFFF))
-        global.region_has_any_targets[index] = any_targets
-        
+        region_data.any_targets = any_targets
+
         if highest_value_entity ~= nil then
             Logger.log("Highest value target: "  .. highest_value_entity.name .. " at position " .. serpent.line(highest_value_entity.position) .. ", with a value of " .. highest_value)
             local unit_count = expansion_phase.min_biter_attack_group + math.random(expansion_phase.min_biter_attack_group / 2)
-            local search_distance = expansion_phase.min_biter_search_distance + math.random(32, 64)
-            highest_value_entity.surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = unit_count, unit_search_distance = search_distance})
-            region:mark_attack_position(highest_value_entity.position)
+            surface.set_multi_command({command = {type=defines.command.attack, target=highest_value_entity, distraction=defines.distraction.none}, unit_count = unit_count, unit_search_distance = search_distance})
+            region.mark_attack_position(region_data, highest_value_entity.position)
 
             return true
         else
-            Logger.log("No valuable targets for " .. region:tostring() .. ". Minimum value was: " .. highest_value)
+            Logger.log("No valuable targets for " .. region.tostring(region_data) .. ". Minimum value was: " .. highest_value)
             return false
         end
     end
 
-    function Map:iterateEnemyRegions()
+    function Map:iterate_enemy_regions()
         -- check and update enemy regions every 5 s in non-peaceful, and every 60s in peaceful
         local frequency = 300
         if global.expansion_state == "Peaceful" then
@@ -126,109 +100,114 @@ function Map.new()
         end
 
     	if (game.tick % frequency == 0) then
-    		if #global.enemyRegionQueue == 0 then
+    		if #global.enemy_regions == 0 then
     			Logger.log("No enemy regions found.")
     		else
-                local iterations = math.min(5, #global.enemyRegionQueue)
+                local iterations = math.min(5, #global.enemy_regions)
                 for i = 1, iterations do
-                    local enemyRegionCoords = table.remove(global.enemyRegionQueue, 1)
-                    if enemyRegionCoords == nil then break end
-                    
-                    local enemyRegion = Region.byRegionCoords(enemyRegionCoords)
-                    local index = bit32.bor(bit32.lshift(enemyRegionCoords.x, 16), bit32.band(enemyRegionCoords.y, 0xFFFF))
-                    local any_targets = global.region_has_any_targets[index] or global.region_has_any_targets[index] == nil
-                    if not any_targets then
-                        Logger.log("No targets available (cache: " .. index .. ") in " .. enemyRegion:tostring())
-                    end
-                    
-        			if any_targets and #enemyRegion:find_entities({"biter-spawner", "spitter-spawner"}, 0) > 0 then
-                        global.enemyRegionQueue[#global.enemyRegionQueue + 1] = enemyRegionCoords
+                    local enemy_region = table.remove(global.enemy_regions, 1)
+                    if enemy_region == nil then break end
 
-                        if global.expansion_state ~= "Peaceful" then
-                            self:updateRegionAI(enemyRegion)
+                    Logger.log("Checking enemy region: " .. region.tostring(enemy_region))
+        			if region.update_biter_base_locations(enemy_region) then
+                        -- add back to the end of the list
+                        table.insert(global.enemy_regions, enemy_region)
+
+                        if global.expansion_state == "Peaceful" then
+                            break
                         end
-                        break
+                        Logger.log("Updating enemy region ai: " .. region.tostring(enemy_region))
+                        if self:update_region_ai(enemy_region) then
+                            break
+                        end
         			end
                 end
     		end
     	end
     end
 
-    function Map:iterateMap()
-    	if (game.tick % 120 == 0) then
-    		local region = self:nextRegion()
+    function Map:iterate_map()
+    	if (game.tick % 150 == 0) then
+    		local region_data = self:next_region()
 
-    		if not self:isEnemyRegion(region) and #region:find_entities({"biter-spawner", "spitter-spawner"}, 0) > 0 then
-    			global.enemyRegionQueue[#global.enemyRegionQueue + 1] = {x = region:getX(), y = region:getY()}
+            Logger.log("Iterating map, region: " .. region.tostring(region_data))
+    		if not self:is_enemy_region(region_data) and region.update_biter_base_locations(region_data) then
+                Logger.log("Found enemy region: " .. region.tostring(region_data))
+    			table.insert(global.enemy_regions, region_data)
     		end
     	end
     end
 
-    function Map:seedInitialQueue()
-        Logger.log("Seeding initial region queue")
+    function Map:seed_initial_values()
+        Logger.log("Seeding initial region values")
 
     	-- reset lists
-    	global.visitedRegions = {}
-    	global.regionQueue = {}
+    	global.visited_regions = {}
+    	global.region_queue = {}
+        global.enemy_regions = {}
 
     	for i = 1, #game.players do
     		if game.players[i].connected then
-                self:addPartiallyCharted(Region.new(game.players[i].position))
+                self:add_partially_charted(region.lookup_region_from_position(game.players[i].surface, game.players[i].position))
     		end
     	end
-    	global.regionQueue[#global.regionQueue + 1] = {x = 0, y = 0}
+    	table.insert(global.region_queue, region.lookup_region(game.surfaces.nauvis.name, 0, 0))
     end
 
-    function Map:nextRegion()
-    	if #global.regionQueue == 0 then
-            self:seedInitialQueue()
+    function Map:next_region()
+    	if #global.region_queue == 0 then
+            self:seed_initial_values()
     	end
-    	local nextRegion = Region.byRegionCoords(table.remove(global.regionQueue, 1))
+        --Logger.log("Region queue: " .. serpent.line(global.region_queue))
+        --Logger.log("Visited Regions: " .. serpent.line(global.visited_regions))
+        --Logger.log("Enemy Regions: " .. serpent.line(global.enemy_regions))
 
-    	self:addPartiallyCharted(nextRegion:offset(1, 0))
-        self:addPartiallyCharted(nextRegion:offset(-1, 0))
-        self:addPartiallyCharted(nextRegion:offset(0, 1))
-        self:addPartiallyCharted(nextRegion:offset(0, -1))
+    	local next_region = table.remove(global.region_queue, 1)
 
-    	global.visitedRegions[#global.visitedRegions + 1] = {x = nextRegion:getX(), y = nextRegion:getY()}
+    	self:add_partially_charted(region.offset(next_region, 1, 0))
+        self:add_partially_charted(region.offset(next_region, -1, 0))
+        self:add_partially_charted(region.offset(next_region, 0, 1))
+        self:add_partially_charted(region.offset(next_region, 0, -1))
 
-    	return nextRegion
+    	table.insert(global.visited_regions, next_region)
+
+    	return next_region
     end
 
-    function Map:isAlreadyIterated(region)
-    	for i = 1, #global.visitedRegions do
-    		if (global.visitedRegions[i].x == region:getX() and global.visitedRegions[i].y == region:getY()) then
+    function Map:is_already_iterated(region_data)
+    	for i = 1, #global.visited_regions do
+    		if (global.visited_regions[i].x == region_data.x and global.visited_regions[i].y == region_data.y) then
     			return true
     		end
     	end
     	return false
     end
 
-    function Map:isPendingIteration(region)
-    	for i = 1, #global.regionQueue do
-    		if (global.regionQueue[i].x == region:getX() and global.regionQueue[i].y == region:getY()) then
+    function Map:is_pending_iteration(region_data)
+    	for i = 1, #global.region_queue do
+    		if (global.region_queue[i].x == region_data.x and global.region_queue[i].y == region_data.y) then
     			return true
     		end
     	end
     	return false
     end
 
-    function Map:isEnemyRegion(region)
-    	for _, enemyRegion in pairs(global.enemyRegionQueue) do
-    		if (enemyRegion.x == region:getX() and enemyRegion.y == region:getY()) then
+    function Map:is_enemy_region(region_data)
+    	for _, enemy_region in pairs(global.enemy_regions) do
+    		if (enemy_region.x == region_data.x and enemy_region.y == region_data.y) then
     			return true
     		end
     	end
     	return false
     end
 
-    function Map:addPartiallyCharted(region)
-    	if not (self:isAlreadyIterated(region) or self:isPendingIteration(region)) then
-    		if region:isPartiallyCharted() then
-    			global.regionQueue[#global.regionQueue + 1] = {x = region:getX(), y = region:getY()}
+    function Map:add_partially_charted(region_data)
+    	if not (self:is_already_iterated(region_data) or self:is_pending_iteration(region_data)) then
+    		if region.is_partially_charted(region_data) then
+    			table.insert(global.region_queue, region_data)
     		else
     			-- don't recheck if partially charted over and over in the future, just add to 'visited list'
-    			global.visitedRegions[#global.visitedRegions + 1] = {x = region:getX(), y = region:getY()}
+    			table.insert(global.visited_regions, region_data)
     		end
     	end
     end

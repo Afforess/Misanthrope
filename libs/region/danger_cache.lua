@@ -1,12 +1,13 @@
-require "defines"
-
 --represents the 'danger value' for each pair of x,y coordinates in a region
 --danger radiates outword from turrets, decreasing by distance
-local DangerCacheClass = {}
-local DangerCache = {}
-DangerCache.__index = DangerCache
+danger_cache = {}
+danger_cache.__index = danger_cache
 
-function DangerCache:tostring()
+function danger_cache.get_region(cache)
+    return global.regions[cache.region_key]
+end
+
+function danger_cache.tostring(cache)
     local cache_str = "[ "
     
     local size = 128
@@ -16,20 +17,31 @@ function DangerCache:tostring()
             if dy > 0 then
                 cache_str = cache_str .. ", "
             end
-            cache_str = cache_str .. self.danger_cache[dx][dy]
+            cache_str = cache_str .. cache.danger_cache[dx][dy]
         end
         cache_str = cache_str .. "]"
     end
     cache_str = cache_str .. " ]"
 
-    return "DangerCache {region: ".. self.region:tostring() .. ", cache: ".. cache_str .. "}"
+    return "DangerCache {region: ".. region.tostring(danger_cache.get_region(cache)) .. ", cache: ".. cache_str .. "}"
 end
 
-function DangerCache:calculate()
-    self:reset(false)
-    self.calculated_at = game.tick
+function danger_cache.calculate(cache)
+    cache.all_zeros = nil
+    cache.danger_cache = {}
+    local size = 128
+    for x = 0, size - 1 do
+        for y = 0, size - 1 do
+             if not cache.danger_cache[x] then
+                 cache.danger_cache[x] = {}
+             end
+             cache.danger_cache[x][y] = 0
+        end
+    end
+    cache.calculated_at = game.tick
     
-    local area = self.region:region_area(0)
+    local region_data = danger_cache.get_region(cache)
+    local area = region.region_area(region_data, 0)
     -- examine area +/- 25 blocks around edge of area, turrets may be slightly outside region
     area.left_top.x = area.left_top.x - 25
     area.left_top.y = area.left_top.y - 25
@@ -39,8 +51,9 @@ function DangerCache:calculate()
     local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
     local turret_defense_value = {2000, 100, 600, 300}
     local turret_range = 35
-    local surface = game.surfaces.nauvis
+    local surface = region.get_surface(region_data)
 
+    local any_values = false
     for i = 1, #turret_names do
         local turret_entities = surface.find_entities_filtered({area = area, name = turret_names[i]})
         for j = 1, #turret_entities do
@@ -52,7 +65,7 @@ function DangerCache:calculate()
                 for dy = -turret_range, turret_range do
                     local x_pos = math.floor(turret_x + dx)
                     local y_pos = math.floor(turret_y + dy)
-                    if self.region:isCoordsInside(x_pos, y_pos) then
+                    if region.is_coords_inside(region_data, x_pos, y_pos) then
                         local dist_squared = (x_pos - turret_x) * (x_pos - turret_x) + (y_pos - turret_y) * (y_pos - turret_y)
                         local dist = math.sqrt(dist_squared)
                         local x_idx = bit32.band(x_pos, 0x7F)
@@ -60,67 +73,40 @@ function DangerCache:calculate()
                         
                         -- eq: y ^ (1/(x ^ (x / 100))). Graph it.
                         local danger = math.pow(defense_value, (1 / (math.pow(dist, (dist / 100)))))
-                        self.danger_cache[x_idx][y_idx] = self.danger_cache[x_idx][y_idx] + danger
+                        cache.danger_cache[x_idx][y_idx] = cache.danger_cache[x_idx][y_idx] + danger
+                        
+                        any_values = true
                     end
                 end
             end                
         end
     end
     
-    -- update serialized data
-    self:save()
+    if not any_values then
+        cache.danger_cache = nil
+        cache.all_zeros = true
+    end
 end
 
-function DangerCache:save()
-    local index = bit32.bor(bit32.lshift(self.region:getX(), 16), bit32.band(self.region:getY(), 0xFFFF))
-    global.dangerCache[index] = self:serialize()
-end
-
-function DangerCache:getDanger(position)
+function danger_cache.get_danger(cache, position)
     local x = math.floor(position.x)
     local y = math.floor(position.y)
-    if self.region:isCoordsInside(x, y) then
+    local region_data = danger_cache.get_region(cache)
+    if region.is_coords_inside(region_data, x, y) then
+        if cache.all_zeros then
+            return 0
+        end
         local x_idx = bit32.band(x, 0x7F)
         local y_idx = bit32.band(y, 0x7F)
-        return self.danger_cache[x_idx][y_idx]
+        return cache.danger_cache[x_idx][y_idx]
     end
     return -1
 end
 
-function DangerCache:reset(save)
-    self.danger_cache = {}
-    local size = 128
-
-    for x = 0, size - 1 do
-        for y = 0, size - 1 do
-             if not self.danger_cache[x] then
-                 self.danger_cache[x] = {}
-             end
-             self.danger_cache[x][y] = 0
-        end
-    end
-    if save then
-        -- update serialized data
-        self:save()
-    end
+function danger_cache.reset(cache)
+    cache.danger_cache = {all_zeros = true, region_key = cache.region_key, calculated_at = -1}
 end
 
-function DangerCache:calculatedAt()
-    return self.calculated_at
+function danger_cache.new(region_data)
+    return {all_zeros = true, region_key = region.region_key(region_data), calculated_at = -1}
 end
-
-function DangerCache:serialize()
-    return {calculated_at = self.calculated_at, region = {x = self.region:getX(), y = self.region:getY()}, danger_cache = self.danger_cache}
-end
-
-function DangerCacheClass.deserialize(data, RegionClass)
-    return setmetatable({calculated_at = data.calculated_at, region = RegionClass.byRegionCoords(data.region), danger_cache = data.danger_cache}, DangerCache)
-end
-
-function DangerCacheClass.new(region)
-    local self = setmetatable({calculated_at = -1, region = region, danger_cache = {}}, DangerCache)
-    self:reset(false)
-    return self
-end
-
-return DangerCacheClass
