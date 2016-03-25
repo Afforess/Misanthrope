@@ -306,8 +306,9 @@ function Harpa.tick_emitter(entity, radius)
                 command = {type = defines.command.attack, target = entity, distraction = distraction.none}
                 ignore_time = 60 * 60
             end
-            if not pcall(biter.set_command, command) then
-                Logger.log("Error executing biter command command: " .. serpent.block(command))
+             local status, err = pcall(biter.set_command, command)
+             if not status then
+                Logger.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end
