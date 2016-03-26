@@ -63,7 +63,11 @@ end)
 script.on_event(defines.events.on_player_mined_item, function(event)
 	if event and event.item_stack and event.item_stack.name and game.entity_prototypes[event.item_stack.name] then
 		if game.entity_prototypes[event.item_stack.name].type == "electric-pole" then
-			Harpa.update_power_grid(game.players[event.player_index].character.position, 10, nil)
+			if game.players[event.player_index].character then
+				Harpa.update_power_grid(game.players[event.player_index].character.position, 10, nil)
+			else
+				Harpa.update_power_grid(game.players[event.player_index].position, 10, nil)
+			end
 		end
 	end
 end)
