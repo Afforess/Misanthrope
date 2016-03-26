@@ -28,6 +28,52 @@
 pathfinder = {}
 pathfinder.__index = pathfinder
 
+-- Partially search for a path on the given surface between the start_pos and goal_pos
+-- If the search completes, the path object will be inside of the returned table { completed = true, path = { ... }}
+-- If the search is not yet completed, the returned table will be { completed = false, ... }
+-- Pathfinding can be resumed with pathfinder.resume_a_star
+function pathfinder.partial_a_star(surface, start_pos, goal_pos, max_iterations)
+    start_pos = {x = math.floor(start_pos.x), y = math.floor(start_pos.y)}
+    goal_pos = {x = math.floor(goal_pos.x), y = math.floor(goal_pos.y)}
+
+    local surface_name = surface.name
+    local closed_set = {}
+    local open_set = { start_pos }
+    local came_from = {}
+
+    local g_score = {}
+    local f_score = {}
+    g_score[pathfinder.node_key(surface_name, start_pos)] = 0
+    f_score[pathfinder.node_key(surface_name, start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
+
+    local pathfinding_data = 
+    {
+        surface = surface,
+        start_pos = start_pos,
+        goal_pos = goal_pos,
+        closed_set = closed_set,
+        open_set = open_set,
+        came_from = came_from,
+        g_score = g_score,
+        f_score = f_score,
+        iterations = 0,
+        completed = false
+    }
+    return pathfinder.resume_a_star(pathfinding_data, max_iterations)
+end
+
+-- Resumes an uncomplete pathfinding search, given the partially completed data and max iterations
+function pathfinder.resume_a_star(pathfinding_data, max_iterations)
+    for i = 1, max_iterations do
+        local result = pathfinder.step_a_star(pathfinding_data)
+        if pathfinding_data.completed then
+            return { completed = true, path = result }
+        end
+    end
+    return pathfinding_data
+end
+
+-- Find a complete path on the given surface between the start_pos and goal_pos
 function pathfinder.a_star(surface, start_pos, goal_pos)
     start_pos = {x = math.floor(start_pos.x), y = math.floor(start_pos.y)}
     goal_pos = {x = math.floor(goal_pos.x), y = math.floor(goal_pos.y)}
@@ -42,35 +88,63 @@ function pathfinder.a_star(surface, start_pos, goal_pos)
     g_score[pathfinder.node_key(surface_name, start_pos)] = 0
     f_score[pathfinder.node_key(surface_name, start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
 
-    local iterations = 0
-    while #open_set > 0 do
-        if iterations > 10000 then
+    local pathfinding_data = 
+    {
+        surface = surface,
+        start_pos = start_pos,
+        goal_pos = goal_pos,
+        closed_set = closed_set,
+        open_set = open_set,
+        came_from = came_from,
+        g_score = g_score,
+        f_score = f_score,
+        iterations = 0,
+        completed = false
+    }
+    while not pathfinding_data.completed do
+        local result = pathfinder.step_a_star(pathfinding_data)
+        if pathfinding_data.completed then
+            return result
+        end
+    end
+    Logger.log("Error completing pathfinding for: " .. serpent.line(pathfinding_data))
+    return nil
+end
+
+function pathfinder.step_a_star(data)
+    local surface_name = data.surface.name
+
+    if #data.open_set > 0 then
+        if data.iterations > 100000 then
+            data.completed = true
+            Logger.log("Exceeded iterations pathfinding for: " .. serpent.line(pathfinding_data))
             return nil
         end
-        iterations = iterations + 1
+        data.iterations = data.iterations + 1
 
-        local current = pathfinder.lowest_f_score(surface_name, open_set, f_score)
-        if current.x == goal_pos.x and current.y == goal_pos.y then
-            local path = pathfinder.unwind_path(surface_name, {}, came_from, goal_pos)
-            table.insert(path, goal_pos)
+        local current = pathfinder.lowest_f_score(surface_name, data.open_set, data.f_score)
+        if current.x == data.goal_pos.x and current.y == data.goal_pos.y then
+            local path = pathfinder.unwind_path(surface_name, {}, data.came_from, data.goal_pos)
+            table.insert(path, data.goal_pos)
+            data.completed = true
             return path
         end
 
-        pathfinder.remove_node(open_set, current)
-        table.insert(closed_set, current)
+        pathfinder.remove_node(data.open_set, current)
+        table.insert(data.closed_set, current)
 
-        local neighbors = pathfinder.neighbor_nodes(surface, current)
+        local neighbors = pathfinder.neighbor_nodes(data.surface, current)
         for _, neighbor in ipairs(neighbors) do
-            if pathfinder.not_in(closed_set, neighbor) then
-                local tentative_g_score = g_score[pathfinder.node_key(surface_name, current)] + pathfinder.heuristic_cost_estimate(current, neighbor)
+            if pathfinder.not_in(data.closed_set, neighbor) then
+                local tentative_g_score = data.g_score[pathfinder.node_key(surface_name, current)] + pathfinder.heuristic_cost_estimate(current, neighbor)
 
                 local neighbor_key = pathfinder.node_key(surface_name, neighbor)
-                if pathfinder.not_in(open_set, neighbor) or tentative_g_score < g_score[neighbor_key] then
-                    came_from[neighbor_key] = current
-					g_score[neighbor_key] = tentative_g_score
-					f_score[neighbor_key] = g_score[neighbor_key] + pathfinder.heuristic_cost_estimate(neighbor, goal_pos)
-					if pathfinder.not_in(open_set, neighbor) then
-						table.insert(open_set, neighbor)
+                if pathfinder.not_in(data.open_set, neighbor) or tentative_g_score < data.g_score[neighbor_key] then
+                    data.came_from[neighbor_key] = current
+					data.g_score[neighbor_key] = tentative_g_score
+					data.f_score[neighbor_key] = data.g_score[neighbor_key] + pathfinder.heuristic_cost_estimate(neighbor, data.goal_pos)
+					if pathfinder.not_in(data.open_set, neighbor) then
+						table.insert(data.open_set, neighbor)
 					end
                 end
             end
@@ -85,9 +159,10 @@ function pathfinder.node_key(surface_name, pos)
 end
 
 function pathfinder.heuristic_cost_estimate(nodeA, nodeB)
-    local axbx = nodeA.x - nodeB.x
-    local ayby = nodeA.y - nodeB.y
-    return math.sqrt(axbx * axbx + ayby * ayby)
+    --local axbx = nodeA.x - nodeB.x
+    --local ayby = nodeA.y - nodeB.y
+    --return math.sqrt(axbx * axbx + ayby * ayby)
+    return math.abs(nodeB.x - nodeA.x) + math.abs(nodeB.y - nodeA.y)
 end
 
 function pathfinder.not_in(set, current_node)

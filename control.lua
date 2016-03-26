@@ -5,6 +5,7 @@ require 'remote'
 require 'libs/EvoGUI'
 require 'libs/map'
 require 'libs/biter_expansion'
+require 'libs/pathfinder_demo'
 local Harpa = require "libs/harpa"
 
 local map = nil
@@ -31,6 +32,7 @@ script.on_event(defines.events.on_tick, function(event)
 	biter_expansion:tick()
 	evo_gui:tick()
 	Harpa.tick()
+	pathfinder_demo.tick()
 end)
 
 -- Strip backer names from HARPA emitters
