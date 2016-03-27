@@ -153,7 +153,7 @@ function region.update_biter_base_locations(region_data)
             end
         end
     end
-    
+
     -- recalculate base position based on center of spawners
     for i = #region_data.enemy_bases, 1, -1 do
         local base = region_data.enemy_bases[i]
@@ -180,9 +180,6 @@ end
 
 function region.get_player_target_cache(region_data)
     local cache = region_data.player_target_cache
-    if cache and cache.calculated_at < 23750000 then
-        cache = nil
-    end
     if cache == nil then
         cache = player_target_cache.new(region_data)
         region_data.player_target_cache = cache
