@@ -7,6 +7,7 @@ local expansion = { name = "Beachhead",
 				   evo_modifier = 0.85,
 				   minimum_attack_value = 0,
 				   min_biter_attack_group = 50,
+				   min_biter_attack_chunk_distance = 20,
 				   min_biter_search_distance = 172}
 
 function expansion:update_expansion_state()

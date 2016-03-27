@@ -7,6 +7,7 @@ local expansion = { name = "Normal",
 				    evo_modifier = 1,
 					minimum_attack_value = 1000,
 					min_biter_attack_group = 10,
+					min_biter_attack_chunk_distance = 8,
 					min_biter_search_distance = 32}
 
 function expansion:update_expansion_state()

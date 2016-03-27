@@ -46,7 +46,7 @@ function BiterExpansion.new()
         if expansion_phase.tick then
             expansion_phase:tick()
         end
-        
+
         -- apparently this is really slow
         if game.tick % 600 == 0 then
             self:update_expansion_factors(expansion_phase)
@@ -97,6 +97,9 @@ function BiterExpansion.new()
 
         self:reset_unit_group()
 
+        game.map_settings.steering.moving.separation_force = 0.005
+        game.map_settings.steering.moving.separation_factor = 1
+
         -- cause pollution to spread farther
         game.map_settings.pollution.diffusion_ratio = 0.05
         game.map_settings.pollution.min_to_diffuse = 10
@@ -116,10 +119,10 @@ function BiterExpansion.new()
             end
 
             -- At 12 hours, the time factor will be at 0.000004 (vanilla value).
-            -- after 108 hours of game play, max value of 0.00002 will be reached
-            local time_factor = math.min(0.00002, 0.000002 + 0.00000000000077160494 * ticks_played)
-            -- after 64 hours of gameplay, max value of 0.000025 will be reached
-            local pollution_factor = math.max(0.000025, 0.000005 + 0.0000000000014467593 * ticks_played)
+            -- after 108 hours of game play, max value of 0.00008 will be reached
+            local time_factor = math.min(0.00008, 0.000002 + 0.0000000000030864198 * ticks_played)
+            -- after 64 hours of gameplay, max value of 0.00005 will be reached
+            local pollution_factor = math.max(0.00005, 0.000005 + 0.0000000000028935186 * ticks_played)
 
             if global.harpa_list and global.idle_harpa_list then
                 if #global.harpa_list > 0 or #global.idle_harpa_list > 0 then

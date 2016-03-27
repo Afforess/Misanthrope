@@ -103,10 +103,6 @@ function danger_cache.get_danger(cache, position)
     return -1
 end
 
-function danger_cache.reset(cache)
-    cache.danger_cache = {all_zeros = true, region_key = cache.region_key, calculated_at = -1}
-end
-
 function danger_cache.new(region_data)
     return {all_zeros = true, region_key = region.region_key(region_data), calculated_at = -1}
 end

@@ -1,4 +1,6 @@
 require "libs/region/danger_cache"
+require "libs/region/player_target_cache"
+
 --region is a 4x4 area of chunks
 
 region = {}
@@ -6,7 +8,7 @@ region.__index = region
 
 region.REGION_SIZE = 4
 region.CHUNK_SIZE = 32
-region.MAX_UINT = 4294967296
+MAX_UINT = 4294967296
 
 function region.get_surface(region_data)
     return game.surfaces[region_data.surface_name]
@@ -14,42 +16,42 @@ end
 
 function region.get_chunk_x(region_data)
     if region_data.x < 0 then
-        return bit32.lshift(region_data.x, 2) - region.MAX_UINT
+        return bit32.lshift(region_data.x, 2) - MAX_UINT
     end
     return bit32.lshift(region_data.x, 2)
 end
 
 function region.get_chunk_y(region_data)
     if region_data.y < 0 then
-        return bit32.lshift(region_data.y, 2) - region.MAX_UINT
+        return bit32.lshift(region_data.y, 2) - MAX_UINT
     end
     return bit32.lshift(region_data.y, 2)
 end
 
 function region.get_lower_pos_x(region_data)
     if region_data.x < 0 then
-        return bit32.lshift(region_data.x, 7) - region.MAX_UINT
+        return bit32.lshift(region_data.x, 7) - MAX_UINT
     end
     return bit32.lshift(region_data.x, 7)
 end
 
 function region.get_lower_pos_y(region_data)
     if region_data.y < 0 then
-        return bit32.lshift(region_data.y, 7) - region.MAX_UINT
+        return bit32.lshift(region_data.y, 7) - MAX_UINT
     end
     return bit32.lshift(region_data.y, 7)
 end
 
 function region.get_upper_pos_x(region_data)
     if (1 + region_data.x) < 0 then
-        return bit32.lshift(1 + region_data.x, 7) - region.MAX_UINT
+        return bit32.lshift(1 + region_data.x, 7) - MAX_UINT
     end
     return bit32.lshift(1 + region_data.x, 7)
 end
 
 function region.get_upper_pos_y(region_data)
     if (1 + region_data.y) < 0 then
-        return bit32.lshift(1 + region_data.y, 7) - region.MAX_UINT
+        return bit32.lshift(1 + region_data.y, 7) - MAX_UINT
     end
     return bit32.lshift(1 + region_data.y, 7)
 end
@@ -114,26 +116,55 @@ end
 function region.update_biter_base_locations(region_data)
     local spawners = region.find_entities(region_data, {"biter-spawner", "spitter-spawner"}, 0)
     region_data.enemy_bases = {}
+    -- mark all spawners as their own bases, then consolidate
     for i = 1, #spawners do
         local spawner = spawners[i]
-        local position = spawner.position
-        
-        local found_base = false
-        for j = 1, #region_data.enemy_bases do
-            local base = region_data.enemy_bases[j]
-            local dist_squared = (base.position.x - position.x) * (base.position.x - position.x) + (base.position.y - position.y) * (base.position.y - position.y)
-            if dist_squared < 625 then
-                base.count = base.count + 1
-                found_base = true
-                break
+        local position = { x = math.floor(spawner.position.x), y = math.floor(spawner.position.y) }
+        local base = {position = position, spawner_positions = {position}, count = 1}
+        table.insert(region_data.enemy_bases, base)
+    end
+    for i = #region_data.enemy_bases, 1, -1 do
+        local base = region_data.enemy_bases[i]
+        if base.count == 1 then
+            local merged = false
+
+            for j = #region_data.enemy_bases, 1, -1 do
+                if i ~= j then
+                    local other_base = region_data.enemy_bases[j]
+                    for _, position in pairs(other_base.spawner_positions) do
+                        local dist_squared = (base.position.x - position.x) * (base.position.x - position.x) + (base.position.y - position.y) * (base.position.y - position.y)
+                        -- merge if <= 16 tiles away from any of their spawners
+                        if dist_squared <= 256 then
+                            table.insert(other_base.spawner_positions, base.position)
+                            other_base.count = other_base.count + 1
+                            merged = true
+                            break
+                        end
+                    end
+                    
+                    if merged then
+                        break
+                    end
+                end
             end
-        end
-        if not found_base then
-            local base = {position = position, count = 1}
-            table.insert(region_data.enemy_bases, base)
+            
+            if merged then
+                table.remove(region_data.enemy_bases, i)
+            end
         end
     end
     
+    -- recalculate base position based on center of spawners
+    for i = #region_data.enemy_bases, 1, -1 do
+        local base = region_data.enemy_bases[i]
+        local total_x = 0
+        local total_y = 0
+        for _, position in pairs(base.spawner_positions) do
+            total_x = total_x + position.x
+            total_y = total_y + position.y
+        end
+        base.position = {x = math.floor(total_x / #base.spawner_positions), y = math.floor(total_y / #base.spawner_positions)}
+    end
     Logger.log("Updated " .. region.tostring(region_data) .. " biter base locations, found: " .. serpent.line(region_data.enemy_bases))
     return #region_data.enemy_bases > 0
 end
@@ -147,6 +178,42 @@ function region.offset(region_data, dx, dy)
     return region.lookup_region(region_data.surface_name, region_data.x + dx, region_data.y + dy)
 end
 
+function region.get_player_target_cache(region_data)
+    local cache = region_data.player_target_cache
+    if cache and cache.calculated_at < 23750000 then
+        cache = nil
+    end
+    if cache == nil then
+        cache = player_target_cache.new(region_data)
+        region_data.player_target_cache = cache
+    end
+    return cache
+end
+
+function region.update_player_target_cache(region_data)
+    local cache = region.get_player_target_cache(region_data)
+    if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 6) then
+        Logger.log(region.tostring(region_data) .. " - Player Target Cache recalculating...")
+        player_target_cache.calculate(cache)
+        return true
+    end
+    return false
+end
+
+function region.get_player_target_value_at(region_data, position)
+    local x = math.floor(position.x)
+    local y = math.floor(position.y)
+    if region.is_coords_inside(region_data, x, y) then
+        region.update_player_target_cache(region_data)
+
+        local cache = region.get_player_target_cache(region_data)
+        return player_target_cache.get_value(cache, x, y)
+    end
+
+    local other_region = region.lookup_region_from_position(region.get_surface(region_data), position)
+    return region.get_player_target_value_at(other_region, position)
+end
+
 function region.get_danger_cache(region_data)
     local cache = region_data.danger_cache
     if cache == nil then
@@ -156,16 +223,23 @@ function region.get_danger_cache(region_data)
     return cache
 end
 
+function region.update_danger_cache(region_data)
+    local cache = region.get_danger_cache(region_data)
+    if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 6) then
+        Logger.log(region.tostring(region_data) .. " - Danger cache recalculating...")
+        danger_cache.calculate(cache)
+        return true
+    end
+    return false
+end
+
 function region.get_danger_at(region_data, position)
     local x = math.floor(position.x)
     local y = math.floor(position.y)
     if region.is_coords_inside(region_data, x, y) then
-        local cache = region.get_danger_cache(region_data)
-        if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 3) then
-            Logger.log(region.tostring(region_data) .. " - Danger cache recalculating...")
-            danger_cache.calculate(cache)
-        end
+        region.update_danger_cache(region_data)
 
+        local cache = region.get_danger_cache(region_data)
         if cache.all_zeros then
             return 0
         end
@@ -223,16 +297,22 @@ function region.count_attacks_on_position(region_data, pos)
     return 0
 end
 
-function region.any_potential_targets(region_data, range)
-    for dx = -(range), range, 1 do
-        for dy = -(range), range, 1 do
-            local other_region = region.offset(region_data, dx, dy)
-            if other_region.any_targets == nil or other_region.any_targets then
+function region.any_potential_targets(region_data, chunk_range)
+    local surface = game.surfaces[region_data.surface_name]
+
+    for dx = -(chunk_range), chunk_range do
+        for dy = -(chunk_range), chunk_range do
+            local tile_x = dx * 32 + region.get_lower_pos_x(region_data)
+            local tile_y = dx * 32 + region.get_lower_pos_y(region_data)
+
+            local value = region.get_player_target_value_at(region_data, {x = tile_x, y = tile_y})
+            if value > 0 then
                 return true
             end
         end
     end
-    return false
+    
+    return best_position
 end
 
 function region.region_key(region_data)
@@ -244,10 +324,10 @@ function region.lookup_region_from_position(surface, pos)
     local region_y = bit32.arshift(math.floor(pos.y), 7)
     -- left arithmatic shift returns unsigned int, must add sign back for negative values
     if (pos.x < 0) then
-        region_x = region_x - region.MAX_UINT
+        region_x = region_x - MAX_UINT
     end
     if (pos.y < 0) then
-        region_y = region_y - region.MAX_UINT
+        region_y = region_y - MAX_UINT
     end
 
     return region.lookup_region(surface.name, region_x, region_y)

@@ -7,6 +7,7 @@ local expansion = { name = "Assault",
 					evo_modifier = 0.90,
 					minimum_attack_value = 0,
 					min_biter_attack_group = 75,
+					min_biter_attack_chunk_distance = 16,
 					min_biter_search_distance = 128}
 
 function expansion:update_expansion_state()

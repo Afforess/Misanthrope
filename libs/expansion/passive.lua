@@ -7,6 +7,7 @@ local expansion = { name = "Passive Expansion",
 				   evo_modifier = 0.975,
 				   minimum_attack_value = 100,
 				   min_biter_attack_group = 32,
+				   min_biter_attack_chunk_distance = 10,
 				   min_biter_search_distance = 64}
 
 function expansion:update_expansion_state()

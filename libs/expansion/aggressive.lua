@@ -7,6 +7,7 @@ local expansion = { name = "Aggressive Expansion",
 				    evo_modifier = 0.96,
 					minimum_attack_value = 0,
 					min_biter_attack_group = 50,
+					min_biter_attack_chunk_distance = 12,
 					min_biter_search_distance = 96}
 
 function expansion:update_expansion_state()
