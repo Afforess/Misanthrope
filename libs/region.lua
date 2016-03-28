@@ -316,6 +316,11 @@ function region.region_key(region_data)
     return string.format("%s@{%s,%s}", region_data.surface_name, region_data.x, region_data.y)
 end
 
+function region.lookup_region_key(surface_name, region_x, region_y)
+    region.lookup_region(surface_name, region_x, region_y)
+    return string.format("%s@{%s,%s}", surface_name, region_x, region_y)
+end
+
 function region.lookup_region_from_position(surface, pos)
     local region_x = bit32.arshift(math.floor(pos.x), 7)
     local region_y = bit32.arshift(math.floor(pos.y), 7)

@@ -28,6 +28,32 @@ function Map.new()
     global.enemyRegionQueue = nil
     global.foo = nil
     global.bar = nil
+    
+    if not global.migrated_keys then
+        global.migrated_keys = true
+        
+        local region_queue = {}
+        for _, region_data in pairs(global.region_queue) do
+            table.insert(region_queue, region.region_key(region_data))
+        end
+        global.region_queue = region_queue
+        
+        local visited_regions = {}
+        for _, region_data in pairs(global.visited_regions) do
+            visited_regions[region.region_key(region_data)] = true
+        end
+        global.visited_regions = visited_regions
+        
+        local enemy_regions = {}
+        for _, region_data in pairs(global.enemy_regions) do
+            table.insert(enemy_regions, region.region_key(region_data))
+        end
+        global.enemy_regions = enemy_regions
+        
+        Logger.log("Migrated reqion queue structures")
+    end
+    
+    
     local Map = {}
 
     function Map:tick()
@@ -45,6 +71,15 @@ function Map.new()
             if all_completed then
                 global.attack_plans[key] = nil
             end
+        end
+        
+        if not global.foo then
+            for _, region in pairs(global.regions) do
+                if region.danger_cache and not region.danger_cache.all_zeros then
+                    danger_cache.calculate(region.danger_cache)
+                end
+            end
+            global.foo = true
         end
     end
 
@@ -79,13 +114,14 @@ function Map.new()
     			Logger.log("No enemy regions found.")
     		else
                 Logger.log("Current enemy regions: " .. #global.enemy_regions)
-                local enemy_region = table.remove(global.enemy_regions, 1)
+                local enemy_region_key = table.remove(global.enemy_regions, 1)
+                local enemy_region = global.regions[enemy_region_key]
 
                 Logger.log("")
                 Logger.log("Checking enemy region: " .. region.tostring(enemy_region))
     			if region.update_biter_base_locations(enemy_region) and region.any_potential_targets(enemy_region, 16) then
                     -- add back to the end of the list
-                    table.insert(global.enemy_regions, enemy_region)
+                    table.insert(global.enemy_regions, enemy_region_key)
 
                     if global.expansion_state == "Peaceful" then
                         return
@@ -110,7 +146,7 @@ function Map.new()
             Logger.log("Iterating map, region: " .. region.tostring(region_data))
     		if not self:is_enemy_region(region_data) and (region.update_biter_base_locations(region_data) and region.any_potential_targets(region_data, 16)) then
                 Logger.log("Found enemy region: " .. region.tostring(region_data))
-    			table.insert(global.enemy_regions, region_data)
+    			table.insert(global.enemy_regions, region.region_key(region_data))
     		end
     	end
     end
@@ -121,48 +157,41 @@ function Map.new()
     	-- reset lists
     	global.visited_regions = {}
     	global.region_queue = {}
-        global.enemy_regions = {}
 
     	for i = 1, #game.players do
     		if game.players[i].connected then
                 self:add_partially_charted(region.lookup_region_from_position(game.players[i].surface, game.players[i].position))
     		end
     	end
-    	table.insert(global.region_queue, region.lookup_region(game.surfaces.nauvis.name, 0, 0))
+    	table.insert(global.region_queue, region.lookup_region_key(game.surfaces.nauvis.name, 0, 0))
     end
 
     function Map:next_region()
     	if #global.region_queue == 0 then
             self:seed_initial_values()
     	end
-        --Logger.log("Region queue: " .. serpent.line(global.region_queue))
-        --Logger.log("Visited Regions: " .. serpent.line(global.visited_regions))
-        --Logger.log("Enemy Regions: " .. serpent.line(global.enemy_regions))
 
-    	local next_region = table.remove(global.region_queue, 1)
+    	local next_region_key = table.remove(global.region_queue, 1)
+        local next_region = global.regions[next_region_key]
 
     	self:add_partially_charted(region.offset(next_region, 1, 0))
         self:add_partially_charted(region.offset(next_region, -1, 0))
         self:add_partially_charted(region.offset(next_region, 0, 1))
         self:add_partially_charted(region.offset(next_region, 0, -1))
 
-    	table.insert(global.visited_regions, next_region)
+        global.visited_regions[region.region_key(next_region)] = true
 
     	return next_region
     end
 
     function Map:is_already_iterated(region_data)
-    	for i = 1, #global.visited_regions do
-    		if (global.visited_regions[i].x == region_data.x and global.visited_regions[i].y == region_data.y) then
-    			return true
-    		end
-    	end
-    	return false
+        return global.visited_regions[region.region_key(region_data)]
     end
 
     function Map:is_pending_iteration(region_data)
+        local region_key = region.region_key(region_data)
     	for i = 1, #global.region_queue do
-    		if (global.region_queue[i].x == region_data.x and global.region_queue[i].y == region_data.y) then
+    		if (global.region_queue[i] == region_key) then
     			return true
     		end
     	end
@@ -170,8 +199,9 @@ function Map.new()
     end
 
     function Map:is_enemy_region(region_data)
-    	for _, enemy_region in pairs(global.enemy_regions) do
-    		if (enemy_region.x == region_data.x and enemy_region.y == region_data.y) then
+        local region_key = region.region_key(region_data)
+    	for _, enemy_region_key in pairs(global.enemy_regions) do
+    		if region_key == enemy_region_key then
     			return true
     		end
     	end
@@ -181,10 +211,10 @@ function Map.new()
     function Map:add_partially_charted(region_data)
     	if not (self:is_already_iterated(region_data) or self:is_pending_iteration(region_data)) then
     		if region.is_partially_charted(region_data) then
-    			table.insert(global.region_queue, region_data)
+    			table.insert(global.region_queue, region.region_key(region_data))
     		else
     			-- don't recheck if partially charted over and over in the future, just add to 'visited list'
-    			table.insert(global.visited_regions, region_data)
+                global.visited_regions[region.region_key(region_data)] = true
     		end
     	end
     end

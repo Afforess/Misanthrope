@@ -85,6 +85,21 @@ function danger_cache.calculate(cache)
     if not any_values then
         cache.danger_cache = nil
         cache.all_zeros = true
+    else
+        for x = 0, size - 1 do
+            local any_values_in_row = false
+            for y = 0, size - 1 do
+                 cache.danger_cache[x][y] = 0
+                 if cache.danger_cache[x][y] > 0 then
+                     any_values_in_row = true
+                     -- convert to integers and set the min value to 1
+                     cache.danger_cache[x][y] = math.floor(math.max(1, cache.danger_cache[x][y]))
+                 end
+            end
+            if not any_values_in_row then
+                cache.danger_cache[x] = nil
+            end
+        end
     end
 end
 
@@ -98,7 +113,10 @@ function danger_cache.get_danger(cache, position)
         end
         local x_idx = bit32.band(x, 0x7F)
         local y_idx = bit32.band(y, 0x7F)
-        return cache.danger_cache[x_idx][y_idx]
+        if cache.danger_cache[x_idx] then
+            return cache.danger_cache[x_idx][y_idx]
+        end
+        return 0
     end
     return -1
 end

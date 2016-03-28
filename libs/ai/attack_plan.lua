@@ -60,29 +60,6 @@ function attack_plan.tick(attack_data)
         return
     else
         attack_plan.coordinate_biters(attack_data)
-        return
-    end
-    
-    if not attack_data.pathfinder_data then
-        local surface = game.surfaces[attack_data.surface_name]
-
-        attack_data.pathfinder_data = pathfinder.partial_a_star(surface, attack_data.position, attack_data.target_position, 10)
-    elseif not attack_data.pathfinder_data.completed then
-        attack_data.pathfinder_data = pathfinder.resume_a_star(attack_data.pathfinder_data, 1)
-        if attack_data.pathfinder_data.iterations > 1000 then
-            Logger.log("Pathfinding between " .. serpent.line(attack_data.position) .. " and " .. serpent.line(attack_data.target_position) .. " took more than 1000 iterations")
-            attack_data.completed = true
-            return
-        end
-    else
-        local path = attack_data.pathfinder_data.path
-        if not path then
-            Logger.log("Failed to find a path between " .. serpent.line(attack_data.position) .. " and " .. serpent.line(attack_data.target_position))
-            attack_data.completed = true
-        else
-            attack_plan.attack_target(attack_data)
-            attack_data.completed = true
-        end
     end
 end
 
