@@ -72,15 +72,6 @@ function Map.new()
                 global.attack_plans[key] = nil
             end
         end
-        
-        if not global.foo then
-            for _, region in pairs(global.regions) do
-                if region.danger_cache and not region.danger_cache.all_zeros then
-                    danger_cache.calculate(region.danger_cache)
-                end
-            end
-            global.foo = true
-        end
     end
 
     function Map:update_region_ai(region_data)
