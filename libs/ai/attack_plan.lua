@@ -49,7 +49,7 @@ function attack_plan.tick(attack_data)
         if attack_data.unit_group.valid then
             attack_data.attack_in_progress = attack_data.attack_in_progress + 1
             --TODO: track state and stop attacking locations that never generate attack state of 2 or 3 (1 -> 4 == never reached target).
-            if attack_data.attack_in_progress % 60 == 0 then
+            if attack_data.attack_in_progress % 600 == 0 then
                 Logger.log("Unit group attack at (" .. serpent.line(attack_data.region_key, {comment = false}) .. ") in progress, state: " .. attack_data.unit_group.state)
             end
         else
