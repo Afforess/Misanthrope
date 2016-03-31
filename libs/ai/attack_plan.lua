@@ -48,6 +48,10 @@ function attack_plan.tick(attack_data)
     if attack_data.unit_group and not attack_data.wait_for_attack then
         if attack_data.unit_group.valid then
             attack_data.attack_in_progress = attack_data.attack_in_progress + 1
+            --TODO: track state and stop attacking locations that never generate attack state of 2 or 3 (1 -> 4 == never reached target).
+            if attack_data.attack_in_progress % 60 == 0 then
+                Logger.log("Unit group attack at (" .. serpent.line(attack_data.region_key, {comment = false}) .. ") in progress, state: " .. attack_data.unit_group.state)
+            end
         else
             attack_data.completed = true
             Logger.log("Took " .. attack_data.attack_in_progress .. " ticks for the unit group to become invalid (attack complete)")
@@ -103,7 +107,7 @@ function attack_plan.coordinate_biters(attack_data)
     attack_data.attack_in_progress = 0
     local command = {type = defines.command.attack_area, destination = attack_data.target_position, radius = 16, distraction = defines.distraction.by_damage}
 
-    if game.evolution_factor > 0.5 and #enemy_units < 20 then
+    if game.evolution_factor > 0.5 and #enemy_units < 20 and math.random() < 0.5 then
         local target_pos = attack_data.target_position
         local half_way_pos = { x = (safe_pos.x + target_pos.x) / 2, y = (safe_pos.y + target_pos.y) / 2} 
         local safe_base_pos = surface.find_non_colliding_position("behemoth-spitter", half_way_pos, 16, 0.5)
@@ -118,6 +122,6 @@ function attack_plan.coordinate_biters(attack_data)
     unit_group.start_moving()
 end
 
-function attack_plan.new(surface_name, position, biter_base)
-    return { position = position, surface_name = surface_name, biter_base = biter_base, completed = false }
+function attack_plan.new(surface_name, position, region_key, biter_base)
+    return { position = position, surface_name = surface_name, region_key = region_key, biter_base = biter_base, completed = false }
 end

@@ -1,5 +1,6 @@
 require "libs/region/danger_cache"
 require "libs/region/player_target_cache"
+require "libs/region/region_coords"
 
 --region is a 4x4 area of chunks
 
@@ -14,50 +15,11 @@ function region.get_surface(region_data)
     return game.surfaces[region_data.surface_name]
 end
 
-function region.get_chunk_x(region_data)
-    if region_data.x < 0 then
-        return bit32.lshift(region_data.x, 2) - MAX_UINT
-    end
-    return bit32.lshift(region_data.x, 2)
-end
-
-function region.get_chunk_y(region_data)
-    if region_data.y < 0 then
-        return bit32.lshift(region_data.y, 2) - MAX_UINT
-    end
-    return bit32.lshift(region_data.y, 2)
-end
-
-function region.get_lower_pos_x(region_data)
-    if region_data.x < 0 then
-        return bit32.lshift(region_data.x, 7) - MAX_UINT
-    end
-    return bit32.lshift(region_data.x, 7)
-end
-
-function region.get_lower_pos_y(region_data)
-    if region_data.y < 0 then
-        return bit32.lshift(region_data.y, 7) - MAX_UINT
-    end
-    return bit32.lshift(region_data.y, 7)
-end
-
-function region.get_upper_pos_x(region_data)
-    if (1 + region_data.x) < 0 then
-        return bit32.lshift(1 + region_data.x, 7) - MAX_UINT
-    end
-    return bit32.lshift(1 + region_data.x, 7)
-end
-
-function region.get_upper_pos_y(region_data)
-    if (1 + region_data.y) < 0 then
-        return bit32.lshift(1 + region_data.y, 7) - MAX_UINT
-    end
-    return bit32.lshift(1 + region_data.y, 7)
-end
-
 function region.is_coords_inside(region_data, x, y)
-    return x >= region.get_lower_pos_x(region_data) and x <= region.get_upper_pos_x(region_data) and y >= region.get_lower_pos_y(region_data) and y <= region.get_upper_pos_y(region_data)
+    local area = region_data.area
+    local left_top = area.left_top
+    local right_bottom = area.right_bottom
+    return x >= left_top.x and x <= right_bottom.x and y >= left_top.y and y <= right_bottom.y
 end
 
 function region.is_position_inside(region_data, pos)
@@ -69,8 +31,8 @@ function region.tostring(region_data)
 end
 
 function region.is_fully_charted(region_data)
-    local chunk_x = region.get_chunk_x(region_data)
-    local chunk_y = region.get_chunk_y(region_data)
+    local chunk_x = region_data.chunk_x
+    local chunk_y = region_data.chunk_y
     local player_force = game.forces.player
     local surface = region.get_surface(region_data)
 
@@ -85,8 +47,8 @@ function region.is_fully_charted(region_data)
 end
 
 function region.is_partially_charted(region_data)
-    local chunk_x = region.get_chunk_x(region_data)
-    local chunk_y = region.get_chunk_y(region_data)
+    local chunk_x = region_data.chunk_x
+    local chunk_y = region_data.chunk_y
     local player_force = game.forces.player
     local surface = region.get_surface(region_data)
 
@@ -170,8 +132,11 @@ function region.update_biter_base_locations(region_data)
 end
 
 function region.region_area(region_data, extra_radius)
-	return {left_top = {x = region.get_lower_pos_x(region_data) - extra_radius, y = region.get_lower_pos_y(region_data) - extra_radius},
-            right_bottom = {x = region.get_upper_pos_x(region_data) + extra_radius, y = region.get_upper_pos_y(region_data) + extra_radius}}
+    if extra_radius == 0 then
+        return region_data.area
+    end
+	return {left_top = {x = region_data.area.left_top.x - extra_radius, y = region_data.area.left_top.y - extra_radius},
+            right_bottom = {x = region_data.area.right_bottom.x + extra_radius, y = region_data.area.right_bottom.y + extra_radius}}
 end
 
 function region.offset(region_data, dx, dy)
@@ -220,11 +185,11 @@ function region.get_danger_cache(region_data)
     return cache
 end
 
-function region.update_danger_cache(region_data)
+function region.update_danger_cache(region_data, phase)
     local cache = region.get_danger_cache(region_data)
     if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 6) then
         Logger.log(region.tostring(region_data) .. " - Danger cache recalculating...")
-        danger_cache.calculate(cache)
+        danger_cache.calculate(cache, phase)
         return true
     end
     return false
@@ -234,15 +199,16 @@ function region.get_danger_at(region_data, position)
     local x = math.floor(position.x)
     local y = math.floor(position.y)
     if region.is_coords_inside(region_data, x, y) then
-        region.update_danger_cache(region_data)
-
         local cache = region.get_danger_cache(region_data)
         if cache.all_zeros then
             return 0
         end
         local x_idx = bit32.band(x, 0x7F)
         local y_idx = bit32.band(y, 0x7F)
-        return cache.danger_cache[x_idx][y_idx]
+        if cache.danger_cache[x_idx] then
+            return cache.danger_cache[x_idx][y_idx]
+        end
+        return 0
     end
 
     local other_region = region.lookup_region_from_position(region.get_surface(region_data), position)
@@ -299,8 +265,8 @@ function region.any_potential_targets(region_data, chunk_range)
 
     for dx = -(chunk_range), chunk_range do
         for dy = -(chunk_range), chunk_range do
-            local tile_x = dx * 32 + region.get_lower_pos_x(region_data)
-            local tile_y = dx * 32 + region.get_lower_pos_y(region_data)
+            local tile_x = dx * 32 + region_data.area.left_top.x
+            local tile_y = dx * 32 + region_data.area.left_top.y
 
             local value = region.get_player_target_value_at(region_data, {x = tile_x, y = tile_y})
             if value > 0 then
@@ -338,8 +304,27 @@ end
 function region.lookup_region(surface_name, region_x, region_y)
     local region_key = string.format("%s@{%s,%s}", surface_name, region_x, region_y)
     if global.regions[region_key] == nil then
-        global.regions[region_key] = {x = region_x, y = region_y, surface_name = surface_name}
+        local region_data = {x = region_x, y = region_y, surface_name = surface_name}
+        region.migrate_regions(region_data)
+        global.regions[region_key] = region_data
     end
 
     return global.regions[region_key]
+end
+
+function region.migrate_regions(region_data)
+    if not region_data.version then
+        region_data.version = 1
+    end
+    if region_data.version < 2 then
+        region_data.version = 2
+        region_data.chunk_x = region_coords.get_chunk_x(region_data)
+        region_data.chunk_y = region_coords.get_chunk_y(region_data)
+
+        region_data.area = {left_top = {}, right_bottom = {}}
+        region_data.area.left_top.x = region_coords.get_lower_pos_x(region_data)
+        region_data.area.left_top.y = region_coords.get_lower_pos_y(region_data)
+        region_data.area.right_bottom.x = region_coords.get_upper_pos_x(region_data)
+        region_data.area.right_bottom.y = region_coords.get_upper_pos_y(region_data)
+    end
 end
