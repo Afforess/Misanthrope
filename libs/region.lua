@@ -1,5 +1,6 @@
 require "libs/region/danger_cache"
 require "libs/region/player_target_cache"
+require "libs/region/biter_scents"
 require "libs/region/region_coords"
 
 --region is a 4x4 area of chunks
@@ -156,24 +157,46 @@ function region.update_player_target_cache(region_data)
     local cache = region.get_player_target_cache(region_data)
     if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 6) then
         Logger.log(region.tostring(region_data) .. " - Player Target Cache recalculating...")
+        region_data.poor_attack_targets = nil
         player_target_cache.calculate(cache)
         return true
     end
     return false
 end
 
-function region.get_player_target_value_at(region_data, position)
-    local x = math.floor(position.x)
-    local y = math.floor(position.y)
+function region.get_player_target_value_at(region_data, x, y)
     if region.is_coords_inside(region_data, x, y) then
-        region.update_player_target_cache(region_data)
+        local cache = region.get_player_target_cache(region_data)
+        local value = player_target_cache.get_value(cache, x, y)
+        
+        local danger = 0
+        if region_data.biter_scents then
+            danger = biter_scents.get_value(region_data.biter_scents, x, y)
+        end
+        return math.max(1, math.floor(value / (1 + danger)))
+    end
 
+    local other_region = region.lookup_region_from_position(region.get_surface(region_data), {x = x, y = y})
+    return region.get_player_target_value_at(other_region, x, y)
+end
+
+function region.get_raw_player_target_value_at(region_data, x, y)
+    if region.is_coords_inside(region_data, x, y) then
         local cache = region.get_player_target_cache(region_data)
         return player_target_cache.get_value(cache, x, y)
     end
 
-    local other_region = region.lookup_region_from_position(region.get_surface(region_data), position)
-    return region.get_player_target_value_at(other_region, position)
+    local other_region = region.lookup_region_from_position(region.get_surface(region_data), {x = x, y = y})
+    return region.get_raw_player_target_value_at(other_region, x, y)
+end
+
+function region.get_biter_scent_cache(region_data)
+    local cache = region_data.biter_scents
+    if cache == nil then
+        cache = biter_scents.new(region_data)
+        region_data.biter_scents = cache
+    end
+    return cache
 end
 
 function region.get_danger_cache(region_data)
@@ -215,67 +238,23 @@ function region.get_danger_at(region_data, position)
     return region.get_danger_at(other_region, position)
 end
 
--- locations biters have been previously assigned to attack
-function region.get_attacked_positions(region_data)
-    local index = bit32.bor(bit32.lshift(region_data.x, 16), bit32.band(region_data.y, 0xFFFF))
-    local attacked_positions = region_data.attacked_positions
-    if attacked_positions == nil then
-        attacked_positions = {}
-        region_data.attacked_positions = attacked_positions
-    end
-    return attacked_positions
-end
-
-function region.mark_attack_position(region_data, pos)
-    local x = math.floor(pos.x)
-    local y = math.floor(pos.y)
-    local found = false
-    local attacked_positions = region.get_attacked_positions(region_data)
-    for i = #attacked_positions, 1, -1 do
-        local prev_attack = attacked_positions[i]
-        if prev_attack.tick + (60 * 60 * 60) < game.tick then
-            -- forget attacks longer than 1 hr ago
-            table.remove(attacked_positions, i)
-        elseif prev_attack.x == x and prev_attack.y == y then
-            prev_attack.count = prev_attack.count + 1
-            prev_attack.tick = game.tick
-            found = true
-            break
-        end
-    end
-    if not found then
-        table.insert(attacked_positions, { x = x, y = y, count = 1, tick = game.tick })
-    end
-end
-
-function region.count_attacks_on_position(region_data, pos)
-    local x = math.floor(pos.x)
-    local y = math.floor(pos.y)
-    local attacked_positions = region.get_attacked_positions(region_data)
-    for i = 1, #attacked_positions do
-        if attacked_positions[i].x == x and attacked_positions[i].y == y then
-            return attacked_positions[i].count
-        end
-    end
-    return 0
-end
-
 function region.any_potential_targets(region_data, chunk_range)
-    local surface = game.surfaces[region_data.surface_name]
-
+    local lx = region_data.area.left_top.x
+    local ly = region_data.area.left_top.y
+    local get_target_value_at = region.get_raw_player_target_value_at
     for dx = -(chunk_range), chunk_range do
         for dy = -(chunk_range), chunk_range do
-            local tile_x = dx * 32 + region_data.area.left_top.x
-            local tile_y = dx * 32 + region_data.area.left_top.y
+            local tile_x = dx * 32 + lx
+            local tile_y = dx * 32 + ly
 
-            local value = region.get_player_target_value_at(region_data, {x = tile_x, y = tile_y})
+            local value = get_target_value_at(region_data, tile_x, tile_y)
             if value > 0 then
                 return true
             end
         end
     end
-    
-    return best_position
+
+    return false
 end
 
 function region.region_key(region_data)

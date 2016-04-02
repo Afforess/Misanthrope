@@ -117,7 +117,6 @@ function danger_cache.calculate(cache, index)
             for x = 0, size - 1 do
                 local any_values_in_row = false
                 for y = 0, size - 1 do
-                     cache.danger_cache[x][y] = 0
                      if cache.danger_cache[x][y] > 0 then
                          any_values_in_row = true
                          -- convert to integers and set the min value to 1

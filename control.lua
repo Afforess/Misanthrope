@@ -57,7 +57,13 @@ script.on_event(defines.events.on_robot_built_entity, function(event)
 end)
 
 script.on_event(defines.events.on_entity_died, function(event)
-	check_power(event.entity, event.entity)
+	local entity = event.entity
+	check_power(entity, entity)
+	if entity.type == "unit" and entity.force == game.forces.enemy then
+		local region_data = region.lookup_region_from_position(entity.surface, entity.position)
+		local cache = region.get_biter_scent_cache(region_data)
+		biter_scents.entity_died(cache, entity)
+	end
 end)
 
 script.on_event(defines.events.on_player_mined_item, function(event)

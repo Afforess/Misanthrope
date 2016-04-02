@@ -16,7 +16,8 @@ function Map.new()
 
     if not global.attack_plans then global.attack_plans = {} end
 
-    if not global.iteration_phase then global.iteration_phase = 1 end
+    if not global.naunce then global.naunce = 0 end
+    if not global.biter_scents then global.biter_scents = {} end
 
     global.enemyRegions = nil
     global.powerShorts = nil
@@ -30,6 +31,7 @@ function Map.new()
     global.enemyRegionQueue = nil
     global.foo = nil
     global.bar = nil
+    global.iteration_phase = nil
 
     if not global.migrated_keys then
         global.migrated_keys = true
@@ -62,19 +64,38 @@ function Map.new()
     local Map = {}
 
     function Map:tick()
+        self:spread_biter_scents()
         self:iterate_map()
         self:iterate_enemy_regions()
-        local count = 0
+        self:tick_attack_plans()
+    end
+
+    function Map:tick_attack_plans()
+        local compute_expense = 0
         for key, plans in pairs(global.attack_plans) do
             local all_completed = true
             for _, plan in pairs(plans) do
-                attack_plan.tick(plan)
+                compute_expense = compute_expense + attack_plan.tick(plan)
+                -- bail early :(
+                if compute_expense >= 5 then
+                    return
+                end
                 if not plan.completed then
                     all_completed = false
                 end
             end
             if all_completed then
                 global.attack_plans[key] = nil
+            end
+        end
+    end
+
+    function Map:spread_biter_scents()
+        local idx = game.tick % 3600
+        local scents = global.biter_scents[idx]
+        if scents then
+            for i = 1, #scents do
+                biter_scents.tick(scents[i])
             end
         end
     end
@@ -115,7 +136,7 @@ function Map.new()
 
                 Logger.log("")
                 Logger.log("Checking enemy region: " .. region.tostring(enemy_region))
-                if region.update_biter_base_locations(enemy_region) and region.any_potential_targets(enemy_region, 16) then
+                if region.update_biter_base_locations(enemy_region) and region.any_potential_targets(enemy_region, 12) then
                     -- add back to the end of the list
                     table.insert(global.enemy_regions, enemy_region_key)
 
@@ -133,24 +154,13 @@ function Map.new()
     end
 
     function Map:iterate_map()
-        if (game.tick % 90 == 0) then
-            local num_turrets = danger_cache.num_turrets()
-            local total_phases = num_turrets + 1
-            Logger.log("Iteration phase: " .. global.iteration_phase .. ", Total Phases: " .. total_phases)
-            if global.iteration_phase == total_phases then
-                global.iteration_phase = 1
-                local region_data = self:next_region(true)
-                region.update_player_target_cache(region_data)
-
-                Logger.log("Iterating map, region: " .. region.tostring(region_data))
-                if not self:is_enemy_region(region_data) and (region.update_biter_base_locations(region_data) and region.any_potential_targets(region_data, 16)) then
-                    Logger.log("Found enemy region: " .. region.tostring(region_data))
-                    table.insert(global.enemy_regions, region.region_key(region_data))
-                end
-            else
-                local region_data = self:next_region(false)
-                region.update_danger_cache(region_data, global.iteration_phase)
-                global.iteration_phase = global.iteration_phase + 1
+        if (game.tick % 120 == 0) then
+            local region_data = self:next_region(true)
+            region.update_player_target_cache(region_data)
+            Logger.log("Iterating map, region: " .. region.tostring(region_data))
+            if not self:is_enemy_region(region_data) and (region.update_biter_base_locations(region_data) and region.any_potential_targets(region_data, 12)) then
+                Logger.log("Found enemy region: " .. region.tostring(region_data))
+                table.insert(global.enemy_regions, region.region_key(region_data))
             end
         end
     end

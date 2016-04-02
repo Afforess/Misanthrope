@@ -3,67 +3,125 @@ require 'libs/pathfinder'
 attack_plan = {}
 attack_plan.__index = attack_plan
 
-function attack_plan.find_best_player_target(attack_data, max_chunks)
-    local best_value = nil
-    local best_position = nil
-    local surface = game.surfaces[attack_data.surface_name]
-    local region_data = region.lookup_region_from_position(surface, attack_data.position)
+function attack_plan.get_region(attack_data)
+    return global.regions[attack_data.region_key]
+end
 
+function attack_plan.begin_target_search(attack_data)
+    local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
+    local max_chunks = expansion_phase.min_biter_attack_chunk_distance
+
+    local chunks = {}
     for dx = -(max_chunks), max_chunks do
         for dy = -(max_chunks), max_chunks do
-            local tile_x = dx * 32 + attack_data.position.x
-            local tile_y = dx * 32 + attack_data.position.y
+            table.insert(chunks, {dx = dx, dy = dy})
+        end
+    end
+    local search_data = {chunks = chunks, best_value = nil, best_position = nil}
+    attack_data.search = search_data
+end
 
-            local value = region.get_player_target_value_at(region_data, {x = tile_x, y = tile_y})
-            value = value / (1 + ((dx * dx) + (dy * dy)))
-            if value > 0 and (best_value == nil or value > best_value)then
-                best_value = value
-                best_position = { x = tile_x, y = tile_y }
+function attack_plan.do_target_search(attack_data, max_chunks)
+    local chunk = table.remove(attack_data.search.chunks, 1)
+    local dx = chunk.dx
+    local dy = chunk.dy
+    local tile_x = dx * 32 + attack_data.position.x
+    local tile_y = dx * 32 + attack_data.position.y
+    
+    local region_data = attack_plan.get_region(attack_data)
+    local value = region.get_player_target_value_at(region_data, tile_x, tile_y)
+    value = value / (1 + ((dx * dx) + (dy * dy)))
+
+    if region_data.poor_attack_targets then
+        for _, pos in pairs(region_data.poor_attack_targets) do
+            local pos_x = pos.x
+            local pos_y = pos.y
+            
+            local axbx = (pos_x - tile_x)
+            local ayby = (pos_y - tile_y)
+            local dist_squared = axbx * axbx + ayby * ayby
+            
+            if dist_squared <= 1024 then
+                value = math.max(1, math.floor(value / 4))
+            elseif dist_squared <= 4096 then
+                value = math.max(1, math.floor(value / 2))
             end
         end
     end
-    
-    return best_position
+    if value > 0 and (attack_data.search.best_value == nil or value > attack_data.search.best_value)then
+        attack_data.search.best_value = value
+        attack_data.search.best_position = { x = tile_x, y = tile_y }
+    end
+
+    return #attack_data.search.chunks == 0
 end
 
+-- Returns how computed computationally expensive tick was (0 - almost free, 10 - very expensive)
 function attack_plan.tick(attack_data)
     if attack_data.completed then
-        return
+        return 0
     end
-    local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
 
-    if not attack_data.target_position then
-        local chunk_search = expansion_phase.min_biter_attack_chunk_distance
-        local attack_target = attack_plan.find_best_player_target(attack_data, chunk_search)
-        if attack_target == nil then
-            Logger.log("Failed to find an attack target within " .. chunk_search .. " chunks of " .. serpent.line(attack_data.position))
-            attack_data.completed = true
-            return
-        else
-            Logger.log("Best attack target within " .. chunk_search .. " chunks of " .. serpent.line(attack_data.position) .. " is " .. serpent.line(attack_target))
-            attack_data.target_position = attack_target
+    -- Find a place to attack
+    if attack_data.search then
+        if attack_plan.do_target_search(attack_data) then
+            if attack_data.search.best_position == nil then
+                attack_plan.complete_plan(attack_data)
+            else
+                attack_data.target_position = attack_data.search.best_position
+                attack_data.search = nil
+            end
         end
+        return 1
+    elseif not attack_data.target_position then
+        attack_plan.begin_target_search(attack_data)
+        return 1
     end
 
     if attack_data.unit_group and not attack_data.wait_for_attack then
         if attack_data.unit_group.valid then
             attack_data.attack_in_progress = attack_data.attack_in_progress + 1
-            --TODO: track state and stop attacking locations that never generate attack state of 2 or 3 (1 -> 4 == never reached target).
-            if attack_data.attack_in_progress % 600 == 0 then
-                Logger.log("Unit group attack at (" .. serpent.line(attack_data.region_key, {comment = false}) .. ") in progress, state: " .. attack_data.unit_group.state)
+            --check to see if we ever actually attacked or if this attack never left to go to the target
+            if not attack_data.attack_ever_began and game.tick % 10 == 0 then
+                local state = attack_data.unit_group.state 
+                attack_data.attack_ever_began = (state == defines.groupstate.attacking_distraction or state == defines.groupstate.attacking_target)
             end
         else
-            attack_data.completed = true
             Logger.log("Took " .. attack_data.attack_in_progress .. " ticks for the unit group to become invalid (attack complete)")
+            attack_plan.complete_plan(attack_data)
         end
         -- 1 minute
         if attack_data.attack_in_progress > (60 * 60 * 60 * 1) then
             Logger.log("Attack unit group never become invalid! Data: {" .. serpent.line(attack_data) .. "}")
-            attack_data.completed = true
+            attack_plan.complete_plan(attack_data)
         end
-        return
     else
         attack_plan.coordinate_biters(attack_data)
+        return 5
+    end
+    
+    return 0
+end
+
+function attack_plan.complete_plan(attack_data)
+    attack_data.completed = true
+    local target_pos = attack_data.target_position
+    if target_pos and not attack_data.attack_ever_began then
+        Logger.log("Attack targeted position but never began")
+        local region_data = attack_plan.get_region(attack_data)
+        if not region_data.poor_attack_targets then
+            region_data.poor_attack_targets = {}
+        end
+        local found = false
+        for _, pos in pairs(region_data.poor_attack_targets) do
+            if pos.x == target_pos.x and pos.y == target_pos.y then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.insert(region_data.poor_attack_targets, target_pos)
+        end
     end
 end
 

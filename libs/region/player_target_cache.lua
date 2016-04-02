@@ -46,9 +46,6 @@ function player_target_cache.calculate(cache)
                 local entity_x = math.floor(entity.position.x)
                 local entity_y = math.floor(entity.position.y)
                 local value = target_data.value
-                local danger = region.get_danger_at(region_data, entity.position)
-                value = math.max(1, math.floor(value / (1 + danger)))
-                
                 local chunk_x = bit32.arshift(entity_x, 5)
                 if entity_x < 0 then
                     chunk_x = chunk_x - MAX_UINT
@@ -57,7 +54,7 @@ function player_target_cache.calculate(cache)
                 if entity_y < 0 then
                     chunk_y = chunk_y - MAX_UINT
                 end
-                
+
                 local idx = bit32.band(bit32.bor(bit32.lshift(bit32.band(chunk_x, 0x3), 2), bit32.band(chunk_y, 0x3)), 0xF)
                 cache.values[idx] = cache.values[idx] + value
                 any_values = true
