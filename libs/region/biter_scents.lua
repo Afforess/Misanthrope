@@ -121,10 +121,12 @@ function biter_scents.tick(cache)
 end
 
 function biter_scents.get_value(cache, x, y)
-    local x_idx = bit32.band(x, 0x7F)
-    local y_idx = bit32.band(y, 0x7F)
-    if cache.values[x_idx] and cache.values[x_idx][y_idx] then
-        return cache.values[x_idx][y_idx]
+    if cache and cache.values then
+        local x_idx = bit32.band(x, 0x7F)
+        local y_idx = bit32.band(y, 0x7F)
+        if cache.values[x_idx] and cache.values[x_idx][y_idx] then
+            return cache.values[x_idx][y_idx]
+        end
     end
     return 0
 end
