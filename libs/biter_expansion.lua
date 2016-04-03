@@ -65,7 +65,12 @@ function BiterExpansion.new()
                     break
                 end
             end
-            self:set_expansion_state(self.expansion[1])
+            -- No more peaceful mode after evolution factor of 50%
+            if game.evolution_factor > 0.5 then
+                self:set_expansion_state(self.expansion[2])
+            else
+                self:set_expansion_state(self.expansion[1])
+            end
         end
     end
 

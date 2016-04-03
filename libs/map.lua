@@ -1,6 +1,7 @@
 require "libs/region"
 require "libs/biter_targets"
 require "libs/ai/attack_plan"
+require "libs/ai/region_attack_plan"
 
 Map = {}
 
@@ -14,7 +15,13 @@ function Map.new()
     -- list of regions with biter or spitter spawners in them
     if not global.enemy_regions then global.enemy_regions = {} end
 
-    if not global.attack_plans then global.attack_plans = {} end
+    if not global.attack_plans_list then
+        global.attack_plans_list = {}
+        for i = 0, 300 do
+            global.attack_plans_list[i] = {}
+        end
+    end
+    if not global.attack_plans_naunce then global.attack_plans_naunce = 0 end
 
     if not global.naunce then global.naunce = 0 end
     if not global.biter_scents then global.biter_scents = {} end
@@ -32,6 +39,8 @@ function Map.new()
     global.foo = nil
     global.bar = nil
     global.iteration_phase = nil
+    global.attack_plans_queue = nil
+    global.attack_plans_queue_idx = nil
 
     if not global.migrated_keys then
         global.migrated_keys = true
@@ -61,6 +70,22 @@ function Map.new()
         region.migrate_regions(region_data)
     end
 
+    -- migrate all attack plans w/o class name
+    if global.attack_plans then
+        for key, plans in pairs(global.attack_plans) do
+            for _, plan in pairs(plans) do
+                if not plan.class then
+                    plan.class = "attack_plan"
+                    plan.attack_tick = 0
+                    table.insert(global.attack_plans_list[global.attack_plans_naunce], plan)
+                    global.attack_plans_naunce = (global.attack_plans_naunce + 1) % 300
+                end
+            end
+        end
+
+        global.attack_plans = nil
+    end
+
     local Map = {}
 
     function Map:tick()
@@ -71,23 +96,54 @@ function Map.new()
     end
 
     function Map:tick_attack_plans()
+        if global.toggle_attack_plans then
+            return
+        end
         local compute_expense = 0
-        for key, plans in pairs(global.attack_plans) do
-            local all_completed = true
-            for _, plan in pairs(plans) do
-                compute_expense = compute_expense + attack_plan.tick(plan)
-                -- bail early :(
-                if compute_expense >= 5 then
-                    return
-                end
-                if not plan.completed then
-                    all_completed = false
-                end
+        local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
+        local max_compute = expansion_phase.compute_time
+        --Abort all attack plans in peaceful
+        if max_compute == 0 and not global.plans_cleared then
+            global.plans_cleared = true
+            for i = 0, 300 do
+                global.attack_plans_list[i] = {}
             end
-            if all_completed then
-                global.attack_plans[key] = nil
+            return
+        end
+        global.plans_cleared = nil
+
+        local count = 0
+        local plans = global.attack_plans_list[game.tick % 300]
+        for i = 1, #plans do
+            local plan = plans[i]
+
+            -- update the attack plan!
+            _G[plan.class].tick(plan)
+            if not plan.completed then
+                count = count + 1
             end
         end
+
+        for i = #plans, 1, -1 do
+            local plan = plans[i]
+            if plan.completed then
+                table.remove(plans, i)
+            end
+        end
+    end
+
+    function Map:any_attack_plans(region_key)
+        local list = global.attack_plans_list
+        for i = 0, 300 do
+            local plans = list[i]
+            for i = 1, #plans do
+                local plan = plans[i]
+                if plan.region_key == region_key then
+                    return true
+                end
+            end
+        end
+        return false
     end
 
     function Map:spread_biter_scents()
@@ -102,35 +158,49 @@ function Map.new()
 
     function Map:update_region_ai(region_data)
         local plan_key = region.region_key(region_data)
-        local region_attack_plans = global.attack_plans[plan_key]
-        if region_attack_plans then
+        if self:any_attack_plans(plan_key) then
             Logger.log("Not scheduling another attack plan, " .. plan_key .. " already has an active attack plan")
         end
         region.update_biter_base_locations(region_data)
         if #region_data.enemy_bases > 0 then
             region_attack_plans = {}
-            for _, base in pairs(region_data.enemy_bases) do
-                local plan = attack_plan.new(region_data.surface_name, base.position, region.region_key(region_data), base)
-                table.insert(region_attack_plans, plan)
-            end
+            local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
+            local rand = math.random(0, 100)
+            if rand < expansion_phase.region_attack_chance then
+                local largest_base = nil
+                for _, base in pairs(region_data.enemy_bases) do
+                    if largest_base == nil or largest_base.count < base.count then
+                        largest_base = base
+                    end
+                end
 
-            Logger.log("Created new region attack plans (" .. plan_key .. "): " .. serpent.line(#region_attack_plans))
-            global.attack_plans[plan_key] = region_attack_plans
+                local plan = region_attack_plan.new(region_data.surface_name, largest_base.position, region.region_key(region_data))
+                --table.insert(global.attack_plans_list[global.attack_plans_naunce], plan)
+                global.attack_plans_naunce = (global.attack_plans_naunce + 1) % 300
+                Logger.log("Created a new region-wide attack plan (" .. plan_key .. ")")
+            else
+                local new_plans = 0
+                for _, base in pairs(region_data.enemy_bases) do
+                    local plan = attack_plan.new(region_data.surface_name, base.position, region.region_key(region_data), base)
+                    table.insert(global.attack_plans_list[global.attack_plans_naunce], plan)
+                    global.attack_plans_naunce = (global.attack_plans_naunce + 1) % 300
+                    new_plans = new_plans + 1
+                end
+                Logger.log("Created new region attack plans (" .. plan_key .. "): " .. new_plans)
+            end
         end
         return true
     end
 
     function Map:iterate_enemy_regions()
-        local frequency = 300
-        if global.expansion_state == "Peaceful" then
-            frequency = 3600
-        end
+        local expansion_phase = BiterExpansion.get_expansion_phase(global.expansion_index)
+        local frequency = expansion_phase.region_update_frequency
 
         if (game.tick % frequency == 0) then
             if #global.enemy_regions == 0 then
                 Logger.log("No enemy regions found.")
             else
-                Logger.log("Current enemy regions: " .. #global.enemy_regions)
+                Logger.log("Current enemy regions: " .. serpent.line(global.enemy_regions, {comment = false}))
                 local enemy_region_key = table.remove(global.enemy_regions, 1)
                 local enemy_region = global.regions[enemy_region_key]
 
@@ -140,7 +210,7 @@ function Map.new()
                     -- add back to the end of the list
                     table.insert(global.enemy_regions, enemy_region_key)
 
-                    if global.expansion_state == "Peaceful" then
+                    if game.peaceful_mode then
                         return
                     end
                     Logger.log("Updating enemy region ai: " .. region.tostring(enemy_region))

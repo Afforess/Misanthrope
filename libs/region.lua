@@ -1,4 +1,3 @@
-require "libs/region/danger_cache"
 require "libs/region/player_target_cache"
 require "libs/region/biter_scents"
 require "libs/region/region_coords"
@@ -92,8 +91,10 @@ function region.update_biter_base_locations(region_data)
             local merged = false
 
             for j = #region_data.enemy_bases, 1, -1 do
-                if i ~= j then
+                -- cap base size to 25 spawners (otherwise regions may become 1 giant base, bad for performance)
+                if i ~= j and region_data.enemy_bases[j].count < 25 then
                     local other_base = region_data.enemy_bases[j]
+
                     for _, position in pairs(other_base.spawner_positions) do
                         local dist_squared = (base.position.x - position.x) * (base.position.x - position.x) + (base.position.y - position.y) * (base.position.y - position.y)
                         -- merge if <= 16 tiles away from any of their spawners
@@ -104,13 +105,13 @@ function region.update_biter_base_locations(region_data)
                             break
                         end
                     end
-                    
+
                     if merged then
                         break
                     end
                 end
             end
-            
+
             if merged then
                 table.remove(region_data.enemy_bases, i)
             end
@@ -128,7 +129,7 @@ function region.update_biter_base_locations(region_data)
         end
         base.position = {x = math.floor(total_x / #base.spawner_positions), y = math.floor(total_y / #base.spawner_positions)}
     end
-    Logger.log("Updated " .. region.tostring(region_data) .. " biter base locations, found: " .. serpent.line(region_data.enemy_bases))
+    Logger.log("Updated " .. region.tostring(region_data) .. " biter base locations, found: " .. serpent.line(region_data.enemy_bases, {comment = false}))
     return #region_data.enemy_bases > 0
 end
 
@@ -168,12 +169,20 @@ function region.get_player_target_value_at(region_data, x, y)
     if region.is_coords_inside(region_data, x, y) then
         local cache = region.get_player_target_cache(region_data)
         local value = player_target_cache.get_value(cache, x, y)
-        
+        if value < 1 then
+            return 0
+        end
+
         local danger = 0
         if region_data.biter_scents then
             danger = biter_scents.get_value(region_data.biter_scents, x, y)
         end
-        return math.max(1, math.floor(value / (1 + danger)))
+        if danger > 0 then
+            return math.max(1, math.floor(value / (1 + danger)))
+        else
+            -- totally danger-free spots are highly valuable
+            return value * 100
+        end
     end
 
     local other_region = region.lookup_region_from_position(region.get_surface(region_data), {x = x, y = y})
@@ -197,45 +206,6 @@ function region.get_biter_scent_cache(region_data)
         region_data.biter_scents = cache
     end
     return cache
-end
-
-function region.get_danger_cache(region_data)
-    local cache = region_data.danger_cache
-    if cache == nil then
-        cache = danger_cache.new(region_data)
-        region_data.danger_cache = cache
-    end
-    return cache
-end
-
-function region.update_danger_cache(region_data, phase)
-    local cache = region.get_danger_cache(region_data)
-    if cache.calculated_at == -1 or (game.tick - cache.calculated_at) > (60 * 60 * 60 * 6) then
-        Logger.log(region.tostring(region_data) .. " - Danger cache recalculating...")
-        danger_cache.calculate(cache, phase)
-        return true
-    end
-    return false
-end
-
-function region.get_danger_at(region_data, position)
-    local x = math.floor(position.x)
-    local y = math.floor(position.y)
-    if region.is_coords_inside(region_data, x, y) then
-        local cache = region.get_danger_cache(region_data)
-        if cache.all_zeros then
-            return 0
-        end
-        local x_idx = bit32.band(x, 0x7F)
-        local y_idx = bit32.band(y, 0x7F)
-        if cache.danger_cache[x_idx] then
-            return cache.danger_cache[x_idx][y_idx]
-        end
-        return 0
-    end
-
-    local other_region = region.lookup_region_from_position(region.get_surface(region_data), position)
-    return region.get_danger_at(other_region, position)
 end
 
 function region.any_potential_targets(region_data, chunk_range)
@@ -305,5 +275,13 @@ function region.migrate_regions(region_data)
         region_data.area.left_top.y = region_coords.get_lower_pos_y(region_data)
         region_data.area.right_bottom.x = region_coords.get_upper_pos_x(region_data)
         region_data.area.right_bottom.y = region_coords.get_upper_pos_y(region_data)
+    end
+    if region_data.version < 3 then
+        region_data.version = 3
+        region_data.danger_cache = nil
+        if region_data.player_target_cache then
+            -- force recalculation
+            region_data.player_target_cache.calculated_at = -1
+        end
     end
 end

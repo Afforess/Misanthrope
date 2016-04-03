@@ -1,3 +1,5 @@
+require 'libs/biter_targets'
+
 --represents the value of player items to biters for each chunk in a region
 player_target_cache = {}
 player_target_cache.__index = player_target_cache
@@ -22,6 +24,34 @@ function player_target_cache.tostring(cache)
     cache_str = cache_str .. " ]"
 
     return "PlayerTargetCache {region: ".. region.tostring(player_target_cache.get_region(cache)) .. ", cache (calculated_at: " .. cache.calculated_at .. "): ".. cache_str .. "}"
+end
+
+function player_target_cache.update(cache, entity)
+    if BITER_TARGETS[entity.name] then
+        if not cache.values then
+            cache.all_zeros = nil
+            cache.values = {}
+            local size = 16
+            for x = 0, size - 1 do
+                cache.values[x] = 0
+            end
+        end
+        local target_data = BITER_TARGETS[entity.name]
+        local entity_x = math.floor(entity.position.x)
+        local entity_y = math.floor(entity.position.y)
+        local value = target_data.value
+        local chunk_x = bit32.arshift(entity_x, 5)
+        if entity_x < 0 then
+            chunk_x = chunk_x - MAX_UINT
+        end
+        local chunk_y = bit32.arshift(entity_y, 5)
+        if entity_y < 0 then
+            chunk_y = chunk_y - MAX_UINT
+        end
+
+        local idx = bit32.band(bit32.bor(bit32.lshift(bit32.band(chunk_x, 0x3), 2), bit32.band(chunk_y, 0x3)), 0xF)
+        cache.values[idx] = cache.values[idx] + value
+    end
 end
 
 function player_target_cache.calculate(cache)

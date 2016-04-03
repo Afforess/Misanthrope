@@ -27,13 +27,26 @@ local function setup()
 end
 
 script.on_event(defines.events.on_tick, function(event)
+	status, err = pcall(do_tick)
+	if not status then
+		Logger.log("Error (" .. serpent.line(err, {comment = false}) .. ") executing tick")
+		for _, player in pairs(game.players) do
+			if player.valid and player.connected then
+				player.print("Error on_tick: " .. serpent.line(err, {comment = false}))
+				player.print("Save and report to: https://goo.gl/48jbSz")
+			end
+		end
+	end
+end)
+
+function do_tick()
 	setup()
 	map:tick()
 	biter_expansion:tick()
 	evo_gui:tick()
 	Harpa.tick()
 	pathfinder_demo.tick()
-end)
+end
 
 -- Strip backer names from HARPA emitters
 script.on_event(defines.events.on_built_entity, function(event)
@@ -42,7 +55,6 @@ script.on_event(defines.events.on_built_entity, function(event)
 		Harpa.register(event.created_entity, event.player_index)
 	end
 	update_regional_targets(event.created_entity)
-	update_danger_cache(event.created_entity)
 	check_power(event.created_entity, nil)
 end)
 
@@ -52,7 +64,6 @@ script.on_event(defines.events.on_robot_built_entity, function(event)
 		Harpa.register(event.created_entity, nil)
 	end
 	update_regional_targets(event.created_entity)
-	update_danger_cache(event.created_entity)
 	check_power(event.created_entity, nil)
 end)
 
@@ -81,25 +92,10 @@ end)
 function update_regional_targets(entity)
 	if entity.force ~= game.forces.enemy and entity.force ~= game.forces.neutral then
 		local region_data = region.lookup_region_from_position(entity.surface, entity.position)
-		if not region_data.any_targets then
-			Logger.log(region.tostring(region_data) .. " has available targets, cache cleared.")
-		end
-		region_data.any_targets = false
-	end
-end
-
-function update_danger_cache(entity)
-	if entity.force ~= game.forces.enemy and entity.force ~= game.forces.neutral then
-		local region_data = region.lookup_region_from_position(entity.surface, entity.position)
-		local turret_names = {"laser-turret", "gun-turret", "gun-turret-2", "biter-emitter"}
-		for i = 1, #turret_names do
-			if entity.name == turret_names[i] then
-				region_data.danger_cache = nil
-				return true
-			end
+		if region_data.player_target_cache and region_data.player_target_cache.calculated_at > 0 then
+			player_target_cache.update(region_data.player_target_cache, entity)
 		end
 	end
-	return false
 end
 
 function check_power(entity, ignore_entity)

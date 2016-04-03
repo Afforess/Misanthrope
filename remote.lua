@@ -6,7 +6,15 @@ remote.add_interface("misanthrope", {
         global.expansion_target_index = target
         global.expansion_phase_request = { index = index }
     end,
-    
+
+    toggle_attack_plans = function()
+        if not global.toggle_attack_plans then
+            global.toggle_attack_plans = true
+        else
+            global.toggle_attack_plans = false
+        end
+    end,
+
     show_path = function(player_idx)
         local pos = game.players[player_idx].position
         if not game.players[player_idx].selected then
@@ -16,7 +24,7 @@ remote.add_interface("misanthrope", {
         local path = pathfinder.a_star(game.players[player_idx].surface, pos, game.players[player_idx].selected.position)
         game.players[player_idx].print(serpent.line(path))
     end,
-    
+
     demo_path = function(player_idx)
         local pos = game.players[player_idx].position
         if not game.players[player_idx].selected then
@@ -32,7 +40,7 @@ remote.add_interface("misanthrope", {
             end
             global.pathfinding_demo = nil
         end
-        global.pathfinding_demo = 
+        global.pathfinding_demo =
         {
             surface = game.players[player_idx].surface,
             start_pos = pos,
