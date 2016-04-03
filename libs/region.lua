@@ -173,6 +173,7 @@ function region.get_player_target_value_at(region_data, x, y)
             return 0
         end
 
+        value = value * 1000
         local danger = 0
         if region_data.biter_scents then
             danger = biter_scents.get_value(region_data.biter_scents, x, y)
