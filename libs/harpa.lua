@@ -303,7 +303,7 @@ function Harpa.tick_emitter(entity, radius)
                 }}
             else
                 -- emitter angers behemoth biters into attacking immediately
-                command = {type = defines.command.attack, target = entity, distraction = distraction.none}
+                command = {type = defines.command.attack, target = entity, distraction = defines.distraction.none}
                 ignore_time = 60 * 60
             end
              local status, err = pcall(biter.set_command, command)
