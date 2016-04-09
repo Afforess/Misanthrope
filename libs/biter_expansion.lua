@@ -127,7 +127,7 @@ function BiterExpansion.new()
             -- after 108 hours of game play, max value of 0.00008 will be reached
             local time_factor = math.min(0.00008, 0.000002 + 0.0000000000030864198 * ticks_played)
             -- after 64 hours of gameplay, max value of 0.00005 will be reached
-            local pollution_factor = math.max(0.00005, 0.000005 + 0.0000000000028935186 * ticks_played)
+            local pollution_factor = math.min(0.00005, 0.000005 + 0.0000000000028935186 * ticks_played)
 
             if global.harpa_list and global.idle_harpa_list then
                 if #global.harpa_list > 0 or #global.idle_harpa_list > 0 then
