@@ -224,7 +224,7 @@ function Map.new()
     end
 
     function Map:iterate_map()
-        if (game.tick % 120 == 0) then
+        if (game.tick % 300 == 0) then
             local region_data = self:next_region(true)
             region.update_player_target_cache(region_data)
             Logger.log("Iterating map, region: " .. region.tostring(region_data))

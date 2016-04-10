@@ -17,7 +17,7 @@ end
 
 function Logger.checkOutput()
     if _G["game"] then
-        if Logger.last_write_size ~= #Logger.log_buffer and (debug or (game.tick - Logger.last_write_tick) > 3600) then
+        if Logger.last_write_size ~= #Logger.log_buffer and (debug or (game.tick - Logger.last_write_tick) > 36000) then
             Logger.dump()
         end
     end

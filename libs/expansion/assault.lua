@@ -11,7 +11,7 @@ local expansion = { name = "Assault",
 					min_biter_search_distance = 128,
 					compute_time = 15,
 					region_attack_chance = 50,
-					region_update_frequency = 60}
+					region_update_frequency = 200}
 
 function expansion:update_expansion_state()
 	game.map_settings.enemy_expansion.enabled = true

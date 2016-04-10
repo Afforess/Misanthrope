@@ -1,5 +1,5 @@
 PACKAGE_NAME := Misanthrope
-VERSION_STRING := 0.3.6
+VERSION_STRING := 0.3.7
 
 OUTPUT_NAME := $(PACKAGE_NAME)_$(VERSION_STRING)
 OUTPUT_DIR := build/$(OUTPUT_NAME)
@@ -34,7 +34,7 @@ package: package-copy $(OUT_FILES)
 
 clean:
 	rm -rf build/
-	
+
 install_mod:
 	if [ -L factorio_mods ] ; \
 	then \

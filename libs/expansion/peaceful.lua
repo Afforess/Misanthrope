@@ -11,7 +11,7 @@ local expansion = {  name = "Peaceful",
 					 min_biter_search_distance = 16,
 					 compute_time = 0,
 					 region_attack_chance = 0,
-					 region_update_frequency = 600}
+					 region_update_frequency = 1200}
 
 function expansion:update_expansion_state()
 	game.map_settings.enemy_expansion.enabled = false
