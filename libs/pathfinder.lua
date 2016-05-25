@@ -46,7 +46,7 @@ function pathfinder.partial_a_star(surface, start_pos, goal_pos, max_iterations)
     g_score[pathfinder.node_key(surface_name, start_pos)] = 0
     f_score[pathfinder.node_key(surface_name, start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
 
-    local pathfinding_data = 
+    local pathfinding_data =
     {
         surface = surface,
         start_pos = start_pos,
@@ -88,7 +88,7 @@ function pathfinder.a_star(surface, start_pos, goal_pos)
     g_score[pathfinder.node_key(surface_name, start_pos)] = 0
     f_score[pathfinder.node_key(surface_name, start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
 
-    local pathfinding_data = 
+    local pathfinding_data =
     {
         surface = surface,
         start_pos = start_pos,
@@ -107,7 +107,7 @@ function pathfinder.a_star(surface, start_pos, goal_pos)
             return result
         end
     end
-    Logger.log("Error completing pathfinding for: " .. serpent.line(pathfinding_data))
+    LOGGER.log("Error completing pathfinding for: " .. serpent.line(pathfinding_data))
     return nil
 end
 
@@ -117,7 +117,7 @@ function pathfinder.step_a_star(data)
     if #data.open_set > 0 then
         if data.iterations > 100000 then
             data.completed = true
-            Logger.log("Exceeded iterations pathfinding for: " .. serpent.line(pathfinding_data))
+            LOGGER.log("Exceeded iterations pathfinding for: " .. serpent.line(pathfinding_data))
             return nil
         end
         data.iterations = data.iterations + 1

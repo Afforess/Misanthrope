@@ -5,12 +5,12 @@ pathfinder_demo.__index = pathfinder_demo
 
 function pathfinder_demo.tick()
     if game.tick % 30 ~= 0 then
-        return 
+        return
     end
     if global.pathfinding_demo then
         local demo_data = global.pathfinding_demo
         if demo_data.ticks_remaining ~= nil then
-            Logger.log("Counting down demo ticks: " .. demo_data.ticks_remaining)
+            LOGGER.log("Counting down demo ticks: " .. demo_data.ticks_remaining)
             demo_data.ticks_remaining = demo_data.ticks_remaining - 1
             if demo_data.ticks_remaining <= 0 then
                 for _, entity in pairs(demo_data.entities) do
@@ -23,7 +23,7 @@ function pathfinder_demo.tick()
         elseif demo_data.started then
             global.pathfinding_demo.data = pathfinder.resume_a_star(global.pathfinding_demo.data, 10)
             local pathfinding_data = global.pathfinding_demo.data
-            --Logger.log("Pathfinding Data: \n" .. serpent.block(pathfinding_data, {comments = false}))
+            --LOGGER.log("Pathfinding Data: \n" .. serpent.block(pathfinding_data, {comments = false}))
 
             if pathfinding_data.completed then
                 demo_data.ticks_remaining = 200
@@ -48,7 +48,7 @@ function pathfinder_demo.tick()
                 end
             end
         else
-            Logger.log("Starting demo: " .. serpent.line(demo_data))
+            LOGGER.log("Starting demo: " .. serpent.line(demo_data))
             demo_data.data = pathfinder.partial_a_star(demo_data.surface, demo_data.start_pos, demo_data.goal_pos, 1)
             demo_data.started = true
             demo_data.entities = {}

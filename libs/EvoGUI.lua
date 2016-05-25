@@ -1,87 +1,118 @@
+require 'defines'
+require 'stdlib/event/event'
 
 EvoGUI = {}
 
-function EvoGUI.new(expansion_phases)
-    local EvoGUI = { expansion_phases = expansion_phases}
+function EvoGUI.create_evolution_rate_text()
+    local diff = game.evolution_factor - global.exponential_moving_average
+    -- percentage is decimal * 100, * 60 for per minute value
+    local evo_rate_per_min = math.abs(diff * 100 * 60)
 
-    function EvoGUI:createEvolutionRateText()
-        local diff = game.evolution_factor - global.exponential_moving_average
-        -- percentage is decimal * 100, * 60 for per minute value
-        local evo_rate_per_min = math.abs(diff * 100 * 60)
-        
-        -- this nonsense is because string.format(%.3f) is not safe in MP across platforms, but integer math is
-        local whole_number = math.floor(evo_rate_per_min)
-        local fractional_component = math.floor((evo_rate_per_min - whole_number) * 1000)
-        local text = string.format("%d.%04d%%", whole_number, fractional_component)
-        if diff > 0 then
-            return "Evolution Rate: +" .. text .. " / min"
-        else
-            return "Evolution Rate: -" .. text .. " / min"
-        end
+    -- this nonsense is because string.format(%.3f) is not safe in MP across platforms, but integer math is
+    local whole_number = math.floor(evo_rate_per_min)
+    local fractional_component = math.floor((evo_rate_per_min - whole_number) * 1000)
+    local text = string.format("%d.%04d%%", whole_number, fractional_component)
+    if diff > 0 then
+        return "Evolution Rate: +" .. text .. " / min"
+    else
+        return "Evolution Rate: -" .. text .. " / min"
     end
+end
 
-    function EvoGUI:calculateEvolutionRateColor()
-        local diff = game.evolution_factor - global.exponential_moving_average
-        
-        if diff > 0 then
-            local red = (100 * 255 * diff) / 0.0035
-            return { r = math.max(0, math.min(255, math.floor( red ))), g = math.max(0, math.min(255, math.floor( 255 - red ))), b = 0 }
-        else
-            return { r = 0, g = 255, b = 0 }
-        end
-    end
-
-    function EvoGUI:createEvolutionText()
-        local expansion_data = self.expansion_phases[global.expansion_index]
-        local text = "Evolution State: " .. expansion_data.name
-        text = text .. " ( " .. math.floor(global.expansion_timer / 60) .. "s )"
-        return text
-    end
-    
-    function EvoGUI:setup()
-        if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
-            global.evo_gui.detected = true
-
-            remote.call("EvoGUI", "create_remote_sensor", {
-                mod_name = "Misanthrope",
-                name = "evolution_state",
-                text = "Evolution State:",
-                caption = "Evolution State"
-            })
-            remote.call("EvoGUI", "create_remote_sensor", {
-                mod_name = "Misanthrope",
-                name = "evolution_rate",
-                text = "Evolution Rate:",
-                caption = "Evolution Rate"
-            })
-            self:updateGUI()
-        end
-    end
-
-    function EvoGUI:tick()
-        if not global.evo_gui then global.evo_gui = {} end
-        if not global.exponential_moving_average then
-            global.exponential_moving_average = game.evolution_factor
-        end
-
-        if not global.evo_gui.detected then
-            self:setup()
-        end
-        if global.evo_gui.detected and game.tick % 3 == 0 then
-            self:updateGUI()
-            if game.tick % 60 == 0 then
-                global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+function EvoGUI.create_biter_scent_text()
+    local player = game.players[1]
+    if player and player.valid and player.connected then
+        local character = player.character
+        if character and character.valid then
+            local pos = character.position
+            local data = Tile.get_data(character.surface, Tile.from_position(pos))
+            if data and data.scent then
+                return "Biter Scent: " .. data.scent
             end
         end
     end
+    return "Biter Scent: 0"
+end
 
-    function EvoGUI:updateGUI()
-        local expansion_data = self.expansion_phases[global.expansion_index]
-        remote.call("EvoGUI", "update_remote_sensor", "evolution_state", self:createEvolutionText(), expansion_data.color)
-        remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", self:createEvolutionRateText(), self:calculateEvolutionRateColor())
+function EvoGUI.create_player_scent_text()
+    local player = game.players[1]
+    if player and player.valid and player.connected then
+        local character = player.character
+        if character and character.valid then
+            local pos = character.position
+            local data = Chunk.get_data(character.surface, Chunk.from_position(pos))
+            if data and data.player_scent then
+                return "Player Scent: " .. data.player_scent
+            end
+        end
+    end
+    return "Player Scent: 0"
+end
+
+function EvoGUI.create_evolution_rate_color()
+    local diff = game.evolution_factor - global.exponential_moving_average
+
+    if diff > 0 then
+        local red = (100 * 255 * diff) / 0.0035
+        return { r = math.max(0, math.min(255, math.floor( red ))), g = math.max(0, math.min(255, math.floor( 255 - red ))), b = 0 }
+    else
+        return { r = 0, g = 255, b = 0 }
+    end
+end
+
+function EvoGUI.setup()
+    if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.create_remote_sensor then
+        global.evo_gui.detected = true
+
+        remote.call("EvoGUI", "create_remote_sensor", {
+            mod_name = "Misanthrope",
+            name = "evolution_rate",
+            text = "Evolution Rate:",
+            caption = "Evolution Rate"
+        })
+        if DEBUG_MODE then
+            remote.call("EvoGUI", "create_remote_sensor", {
+                mod_name = "Misanthrope",
+                name = "biter_scent",
+                text = "Biter Scent:",
+                caption = "Biter Scent"
+            })
+
+            remote.call("EvoGUI", "create_remote_sensor", {
+                mod_name = "Misanthrope",
+                name = "player_scent",
+                text = "Player Scent:",
+                caption = "Player Scent"
+            })
+        end
+        EvoGUI.update_gui()
+    end
+end
+
+Event.register(defines.events.on_tick, function(event)
+    if not global.evo_gui then global.evo_gui = {} end
+    if not global.exponential_moving_average then
+        global.exponential_moving_average = game.evolution_factor
     end
 
-    return EvoGUI
+    if not global.evo_gui.detected then
+        EvoGUI.setup()
+    end
+
+    if global.evo_gui.detected and event.tick % 20 == 0 then
+        EvoGUI.update_gui()
+        if game.tick % 60 == 0 then
+            global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+        end
+    end
+end)
+
+function EvoGUI.update_gui()
+    remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", EvoGUI.create_evolution_rate_text(), EvoGUI.create_evolution_rate_color())
+    if DEBUG_MODE then
+        remote.call("EvoGUI", "update_remote_sensor", "biter_scent", EvoGUI.create_biter_scent_text())
+        remote.call("EvoGUI", "update_remote_sensor", "player_scent", EvoGUI.create_player_scent_text())
+    end
 end
 
 return EvoGUI

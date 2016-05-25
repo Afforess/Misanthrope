@@ -1,22 +1,19 @@
-require "defines"
+require 'defines'
+require 'stdlib/event/event'
 
 Harpa = {}
 
+function Harpa.migrate(old_global)
+    for _, field_name in pairs({"harpa_list", "idle_harpa_list", "unpowered_harpa_list", "biter_ignore_list", "harpa_overlays"}) do
+        global[field_name] = old_global[field_name]
+    end
+end
+
 function Harpa.setup()
-    if not global.harpa_list then
-        global.harpa_list = {}
-    end
-    if not global.idle_harpa_list then
-        global.idle_harpa_list = {}
-    end
-    if not global.unpowered_harpa_list then
-        global.unpowered_harpa_list = {}
-    end
-    if not global.biter_ignore_list then
-        global.biter_ignore_list = {}
-    end
-    if not global.harpa_overlays then
-        global.harpa_overlays = {}
+    for _, field_name in pairs({"harpa_list", "idle_harpa_list", "unpowered_harpa_list", "biter_ignore_list", "harpa_overlays"}) do
+        if not global[field_name] then
+            global[field_name] = {}
+        end
     end
 end
 
@@ -37,7 +34,7 @@ function Harpa.update_power_grid(position, range, ignore_entity)
         return
     end
     local range_squared = range * range
-    
+
     -- check inactive emitters to see if they gained power
     for i = #global.unpowered_harpa_list, 1, -1 do
         local harpa = global.unpowered_harpa_list[i]
@@ -54,7 +51,7 @@ function Harpa.update_power_grid(position, range, ignore_entity)
             table.remove(global.unpowered_harpa_list, i)
         end
     end
-    
+
     -- check active emitters to verify they still have power
     for i = #global.harpa_list, 1, -1 do
         local harpa = global.harpa_list[i]
@@ -139,14 +136,53 @@ function Harpa.create_overlay_entity(surface, opacity, position, list)
     table.insert(list, overlay_entity)
 end
 
-function Harpa.tick()
+function Harpa.check_power(entity, ignore_entity)
+    if entity.prototype.type == "electric-pole" then
+        Harpa.update_power_grid(entity.position, 10, ignore_entity)
+    end
+end
+
+Event.register(defines.events.on_built_entity, function(event)
+    if event.created_entity.name == "biter-emitter" then
+        event.created_entity.backer_name = ""
+        Harpa.register(event.created_entity, event.player_index)
+    end
+    Harpa.check_power(event.created_entity, nil)
+end)
+
+Event.register(defines.events.on_robot_built_entity, function(event)
+    if event.created_entity.name == "biter-emitter" then
+        event.created_entity.backer_name = ""
+        Harpa.register(event.created_entity, nil)
+    end
+    Harpa.check_power(event.created_entity, nil)
+end)
+
+Event.register(defines.events.on_entity_died, function(event)
+    local entity = event.entity
+    Harpa.check_power(entity, entity)
+end)
+
+Event.register(defines.events.on_player_mined_item, function(event)
+    if event and event.item_stack and event.item_stack.name and game.entity_prototypes[event.item_stack.name] then
+        if game.entity_prototypes[event.item_stack.name].type == "electric-pole" then
+            if game.players[event.player_index].character then
+                Harpa.update_power_grid(game.players[event.player_index].character.position, 10, nil)
+            else
+                Harpa.update_power_grid(game.players[event.player_index].position, 10, nil)
+            end
+        end
+    end
+end)
+
+Event.register(defines.events.on_tick, function(event)
     if global.harpa_list then
         if not global.idle_harpa_list then global.idle_harpa_list = {} end
         Harpa.setup()
         Harpa.update_overlays()
-        
+
         -- check idle emitters less often
-        if game.tick % 150 == 0 then
+        if event.tick % 150 == 0 then
             for i = #global.idle_harpa_list, 1, -1 do
                 local harpa = global.idle_harpa_list[i]
                 if not harpa.valid then
@@ -167,19 +203,19 @@ function Harpa.tick()
                 table.remove(global.harpa_list, i)
             else
                 -- check to see if emitter is idle, and we can update it less often
-                if game.tick % 150 == 0 then
+                if event.tick % 150 == 0 then
                     if Harpa.is_idle(harpa, 32) then
                         table.remove(global.harpa_list, i)
                         table.insert(global.idle_harpa_list, harpa)
                     end
-                end  
-          
+                end
+
                 Harpa.tick_emitter(harpa, 30)
             end
         end
     end
     Harpa.update_power_armor()
-end
+end)
 
 function Harpa.has_micro_emitter(player)
     if player.valid and player.connected then
@@ -206,7 +242,7 @@ function Harpa.get_player_armor(player)
 end
 
 function Harpa.update_power_armor()
-    -- hack because we can not tell when armor modules change, so check every 2s for players with micro harpa emitter 
+    -- hack because we can not tell when armor modules change, so check every 2s for players with micro harpa emitter
     if game.tick % 120 == 0 then
         global.micro_harpa_players = {}
         for i = 1, #game.players do
@@ -240,7 +276,7 @@ function Harpa.is_powered(entity, ignore_entity)
         local electric_pole = electric_poles[i]
         if electric_pole ~= ignore_entity then
             local range = ranges_squared[electric_pole.prototype.name]
-            
+
             local pole_pos = electric_pole.position
             local dist_squared = (position.x - pole_pos.x) * (position.x - pole_pos.x) + (position.y - pole_pos.y) * (position.y - pole_pos.y)
             if range ~= nil and Harpa.is_inside_area(Harpa.area_around(pole_pos, range), position) then
@@ -252,7 +288,7 @@ function Harpa.is_powered(entity, ignore_entity)
 end
 
 function Harpa.is_inside_area(area, position)
-    return position.x > area.left_top.x and position.y > area.left_top.y and 
+    return position.x > area.left_top.x and position.y > area.left_top.y and
             position.x < area.right_bottom.x and position.y < area.right_bottom.y
 end
 
@@ -308,7 +344,7 @@ function Harpa.tick_emitter(entity, radius)
             end
              local status, err = pcall(biter.set_command, command)
              if not status then
-                Logger.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
+                LOGGER.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end
