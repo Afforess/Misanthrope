@@ -99,11 +99,9 @@ Event.register(defines.events.on_tick, function(event)
         EvoGUI.setup()
     end
 
-    if global.evo_gui.detected and event.tick % 20 == 0 then
+    if global.evo_gui.detected and event.tick % 10 == 0 then
         EvoGUI.update_gui()
-        if game.tick % 60 == 0 then
-            global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
-        end
+        global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
     end
 end)
 

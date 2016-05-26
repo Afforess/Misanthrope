@@ -27,6 +27,8 @@ function World.setup()
     for _, base in pairs(global.bases) do
         BiterBase.setup(base)
     end
+
+    global.players = game.players
 end
 
 function World.migrate(old_version, new_version)
@@ -46,8 +48,9 @@ function World.migrate(old_version, new_version)
     end
 end
 
-Event.register(defines.events.on_tick, function(event)
+Event.register(Event.core_events.configuration_changed, function(event)
     World.Logger.log("Setting up world...")
+    World.Logger.log("Mod data: " .. serpent.line(event.data, {comment = false}))
     World.setup()
     Event.remove(defines.events.on_tick, event._handler)
     World.Logger.log("World setup complete.")
