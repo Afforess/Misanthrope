@@ -25,6 +25,14 @@ remote.add_interface("misanthrope", {
         game.players[player_idx].print(serpent.line(path))
     end,
 
+    toggle_scents = function()
+        if not global.toggle_scents then
+            global.toggle_scents = true
+        else
+            global.toggle_scents = nil
+        end
+    end,
+
     demo_path = function(player_idx)
         local pos = game.players[player_idx].position
         if not game.players[player_idx].selected then

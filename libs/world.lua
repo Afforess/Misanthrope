@@ -24,10 +24,6 @@ function World.setup()
         global.mod_version = World.version
     end
 
-    for _, base in pairs(global.bases) do
-        BiterBase.setup(base)
-    end
-
     global.players = game.players
 end
 
@@ -47,6 +43,52 @@ function World.migrate(old_version, new_version)
         end
     end
 end
+
+function World.create_entity(surface, entity_data, owner)
+    local entity = surface.create_entity(entity_data)
+
+    if not global.entities then global.entities = circular_buffer.new() end
+    if not global.entities_pending_deletion then global.entities = circular_buffer.new() end
+
+    circular_buffer.append(global.entities, { entity = entity, owner = owner })
+
+    return entity
+end
+
+Event.register(defines.events.on_tick, function(event)
+    local tick = event.tick
+    if tick % 600 == 0 then
+        local iter = circular_buffer.iterator(global.entities)
+        while(iter.has_next()) do
+            local node = iter.next_node()
+            if node then
+                local entity_data = node.value
+                if not entity_data.entity.valid then
+                    circular_buffer.remove(global.entities, node)
+                elseif not entity_data.owner.valid then
+                    entity_data.reap_after = tick + 3600 * 5
+                    circular_buffer.append(global.entities_pending_deletion, entity_data)
+                    circular_buffer.remove(global.entities, node)
+                end
+            end
+        end
+    end
+    if tick % 3600 == 0 then
+        local iter = circular_buffer.iterator(global.entities_pending_deletion)
+        while(iter.has_next()) do
+            local node = iter.next_node()
+            if node then
+                local entity_data = node.value
+                if not entity_data.entity.valid then
+                    circular_buffer.remove(global.entities_pending_deletion, node)
+                elseif entity_data.reap_after < tick then
+                    entity_data.entity.destroy()
+                    circular_buffer.remove(global.entities_pending_deletion, node)
+                end
+            end
+        end
+    end
+end)
 
 Event.register(Event.core_events.configuration_changed, function(event)
     World.Logger.log("Setting up world...")

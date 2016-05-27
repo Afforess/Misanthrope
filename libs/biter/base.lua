@@ -5,6 +5,7 @@ require 'stdlib/area/position'
 require 'stdlib/area/area'
 require 'stdlib/table'
 require 'stdlib/game'
+require 'libs/biter/random_name'
 
 BiterBase = {}
 BiterBase.Logger = Logger.new("Misanthrope", "biter_base", DEBUG_MODE)
@@ -15,10 +16,10 @@ function BiterBase.discover(entity)
     local pos = entity.position
 
     -- initialize biter base data structure
-    local base = { queen = entity, hives = {}, worms = {}, currency = 0, next_tick = game.tick + math.random(300, 1000), valid = true}
+    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), targets = {}, next_tick = game.tick + math.random(300, 1000), valid = true}
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
-    Log("Created new biter base at (%d, %d)", pos.x, pos.y)
+    Log("Created new biter base {%s} at (%d, %d)", base.name, pos.x, pos.y)
 
     -- scan for nearby unclaimed hives
     local surface = entity.surface
@@ -31,7 +32,7 @@ function BiterBase.discover(entity)
             table.insert(base.hives, spawner)
         end
     end
-    Log("Discovered {%d} hives near the new biter base at (%d, %d)", #base.hives, pos.x, pos.y)
+    Log("Discovered {%d} hives near %s", #base.hives, BiterBase.tostring(base))
 
     -- scan for nearby unclaimed worms
     local worms = surface.find_entities_filtered({ area = nearby_area, type = 'turret', force = entity.force})
@@ -40,7 +41,7 @@ function BiterBase.discover(entity)
         Entity.set_data(worm, {base = base})
         table.insert(base.worms, worm)
     end
-    Log("Discovered {%d} worms near the new biter base at (%d, %d)", #base.worms, pos.x, pos.y)
+    Log("Discovered {%d} worms near %s", #base.worms, BiterBase.tostring(base))
 
     -- destroy hives too close, but too far to be useful
     local reclaimed_evo = 0
@@ -51,34 +52,85 @@ function BiterBase.discover(entity)
             reclaimed_evo = reclaimed_evo + 0.003
         end
     end
-    Log("Destroyed {%d} hives near the new biter base at (%d, %d)", math.floor(reclaimed_evo / 0.003), pos.x, pos.y)
+    Log("Destroyed {%d} hives near %s", math.floor(reclaimed_evo / 0.003), BiterBase.tostring(base))
     game.evolution_factor = math.min(1, game.evolution_factor + reclaimed_evo)
 end
 
-function BiterBase.on_queen_death(base)
+function BiterBase.tostring(base)
     local pos = base.queen.position
+    return string.format("{BiterBase: (name: %s, pos: (%d, %d), size: %d)}", base.name, pos.x, pos.y, (1 + #base.hives))
+end
 
-    Log("Biter Base queen at (%d, %d) died", pos.x, pos.y)
+function BiterBase.on_queen_death(base)
+    Log("Biter Base queen died at %s", BiterBase.tostring(base))
     local hives = #table.filter(base.hives, Game.VALID_FILTER)
     if hives == 0 then
-        Log("Biter Base at (%d, %d) has no remaining hives, and no queen. ", pos.x, pos.y)
+        Log("%s has no remaining hives, and no queen. ", BiterBase.tostring(base))
         base.valid = false
         global.bases = table.filter(global.bases, Game.VALID_FILTER)
     else
         local new_queen = table.remove(base.hives, 1)
         base.queen = new_queen
-        Log("Biter Base at (%d, %d) has appointed a new queen at (%d, %d)", pos.x, pos.y, new_queen.position.x, new_queen.position.y)
+        Log("%s has appointed a new queen at (%d, %d)", BiterBase.tostring(base), new_queen.position.x, new_queen.position.y)
     end
 end
 
 function BiterBase.tick(base)
-
+    if not base.plan or base.plan.name == 'idle' then
+        BiterBase.create_plan(base)
+    else
+        local plan_class = BiterBase.plans[base.plan.name].class
+        if not plan_class.tick(base) then
+            BiterBase.set_active_plan(base, 'idle')
+        end
+    end
 end
 
---- Sets up any events needed at the start/load of each game
-function BiterBase.setup(base)
+BiterBase.plans = {
+    idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
+    identify_targets = { passive = true, cost = 100, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
+    attack_area = { passive = false, cost = 1000, update_frequency = 60 },
+    attacked_recently = { passive = false, cost = 100, update_frequency = 60, class = require 'libs/biter/ai/attacked_recently' }
+}
 
+function BiterBase.create_plan(base)
+    if #base.targets == 0 and base.currency > BiterBase.plans.identify_targets.cost then
+        Log("%s has no active targets, and chooses AI plan to identify targets", BiterBase.tostring(base))
+        BiterBase.set_active_plan(base, 'identify_targets')
+        return true
+    end
+    if #base.targets > 0 then
+        for _, plan in pairs(table.filter(BiterBase.plans, function(plan) return not plan.passive end)) do
+
+        end
+    end
+
+    Log("%s has no active plans, and failed to choose any new plan. Idling.", BiterBase.tostring(base))
+    BiterBase.set_active_plan(base, 'idle')
+    return false
 end
+
+function BiterBase.set_active_plan(base, plan_name)
+    local old_plan = base.plan
+    if old_plan then old_plan.valid = false end
+    
+    base.plan = { name = plan_name, data = {}, valid = true}
+    local plan_data = BiterBase.plans[plan_name]
+    base.currency = base.currency - plan_data.cost
+    base.next_tick = game.tick + plan_data.update_frequency
+end
+
+Event.register(defines.events.on_trigger_created_entity, function(event)
+    if event.entity.name == 'spawner-damaged' then
+        local data = Entity.get_data(event.entity)
+        if data and data.base then
+            data.base.last_attacked = event.tick
+            if data.base.plan.name ~= 'attacked_recently' then
+                BiterBase.set_active_plan(data.base, 'attacked_recently')
+            end
+        end
+    end
+end)
 
 Event.register(defines.events.on_tick, function(event)
     local tick = event.tick
