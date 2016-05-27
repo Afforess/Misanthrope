@@ -15,6 +15,7 @@ end)
 
 Event.register(defines.events.on_tick, function(event)
     if global.toggle_scents then return end
+    if not global.players then global.players = game.players end
 
     for index, player in pairs(global.players) do
         if player.valid and player.connected and (event.tick + index) % 120 == 0 then
@@ -52,10 +53,15 @@ Event.register(defines.events.on_tick, function(event)
             for idx, offset in pairs({{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) do
                 local chunk = Position.add(chunk_pos, offset)
                 local chunk_data, chunk_idx = Chunk.get_data(surface, chunk, {})
+                local old_amt = 0
                 if not chunk_data.player_scent then
                     chunk_data.player_scent = math.floor(spread * 0.25)
                 else
+                    old_amt = chunk_data.player_scent
                     chunk_data.player_scent = math.floor(chunk_data.player_scent + (spread * 0.25))
+                end
+                if chunk_data.base then
+                    BiterBase.on_player_scent_changed(chunk_data.base, old_amt, chunk_data.player_scent)
                 end
                 if chunk_data.player_scent > 30 and not visited_chunks[chunk_idx] then
                     visited_chunks[chunk_idx] = true
