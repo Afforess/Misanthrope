@@ -33,15 +33,23 @@ function AttackedRecently.tick(base, data)
         end
     end
     if #biters > 0 then
-        local closest_player = AttackedRecently.closest_player(surface, base.queen.position, 64)
+        local closest_player = AttackedRecently.closest_player(surface, base.queen.position, 56)
         local unit_group = surface.create_unit_group({position = biters[1].position, force = 'enemy'})
         for _, biter in pairs(biters) do
             unit_group.add_member(biter)
         end
         if closest_player then
             unit_group.set_command({type = defines.command.attack, target = closest_player.character})
+            if data.idle_unit_groups then
+                table.each(table.filter(data.idle_unit_groups, Game.VALID_FILTER), function(unit_group)
+                    unit_group.set_command({type = defines.command.attack, target = closest_player.character})
+                end)
+                data.idle_unit_groups = nil
+            end
         else
             unit_group.set_command({type = defines.command.attack_area, destination = base.queen.position, radius = 20})
+            if not data.idle_unit_groups then data.idle_unit_groups = {} end
+            table.insert(data.idle_unit_groups, unit_group)
         end
         unit_group.start_moving()
     end

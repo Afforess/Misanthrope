@@ -18,7 +18,7 @@ function BiterBase.discover(entity)
     local surface = entity.surface
 
     -- initialize biter base data structure
-    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), targets = {}, next_tick = game.tick + math.random(300, 1000), valid = true}
+    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), valid = true}
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
     local chunk_data = Chunk.get_data(surface, Chunk.from_position(pos), {})
@@ -60,9 +60,6 @@ function BiterBase.discover(entity)
 end
 
 function BiterBase.tostring(base)
-    if type(base) ~= 'table' then
-        error("Invalid biter base", 2)
-    end
     local pos = base.queen.position
     return string.format("{BiterBase: (name: %s, pos: (%d, %d), size: %d)}", base.name, pos.x, pos.y, (1 + #base.hives))
 end
@@ -82,7 +79,7 @@ function BiterBase.on_queen_death(base)
 end
 
 function BiterBase.on_player_scent_changed(base, prev_amt, new_amt)
-    Log("Player scent increased from {%d} to {%d} at %s", prev_amt, new_amt, BiterBase.tostring(base))
+    --Log("Player scent increased from {%d} to {%d} at %s", prev_amt, new_amt, BiterBase.tostring(base))
     if (new_amt > 3 * prev_amt and new_amt > 3000) or (new_amt > 20000 and prev_amt < new_amt) then
         if base.plan.name ~= 'alert' and base.plan.name ~= 'attacked_recently' then
             BiterBase.set_active_plan(base, 'alert', { alerted_at = game.tick })
@@ -104,21 +101,20 @@ end
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
     identify_targets = { passive = true, cost = 100, update_frequency = 300, class = require 'libs/biter/ai/identify_targets' },
-    attack_area = { passive = false, cost = 1000, update_frequency = 300 },
+    attack_area = { passive = false, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
     attacked_recently = { passive = false, cost = 100, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
     alert = { passive = false, cost = 100, update_frequency = 180, class = require 'libs/biter/ai/alert' }
 }
 
 function BiterBase.create_plan(base)
-    if #base.targets == 0 and base.currency > BiterBase.plans.identify_targets.cost then
+    if not base.target and base.currency > BiterBase.plans.identify_targets.cost then
         Log("%s has no active targets, and chooses AI plan to identify targets", BiterBase.tostring(base))
         BiterBase.set_active_plan(base, 'identify_targets')
         return true
     end
-    if #base.targets > 0 then
-        for _, plan in pairs(table.filter(BiterBase.plans, function(plan) return not plan.passive end)) do
-
-        end
+    if base.target and base.target.type == 'scent' and base.currency > BiterBase.plans.attack_area.cost then
+        --BiterBase.set_active_plan(base, 'attack_area')
+        return true
     end
 
     Log("%s has no active plans, and failed to choose any new plan. Idling.", BiterBase.tostring(base))

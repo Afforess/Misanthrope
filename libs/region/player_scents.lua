@@ -47,8 +47,8 @@ Event.register(defines.events.on_tick, function(event)
 
         local surface, chunk_pos, data, visited_chunks = unpack(circular_buffer.pop(player_scents))
 
-        local spread = 0.30 * data.player_scent
-        data.player_scent = math.floor(data.player_scent * 0.69)
+        local spread = 0.16 * data.player_scent
+        data.player_scent = math.max(0, math.floor(data.player_scent * 0.84) - 100)
         if spread > 10 then
             for idx, offset in pairs({{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) do
                 local chunk = Position.add(chunk_pos, offset)
