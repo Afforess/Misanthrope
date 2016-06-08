@@ -3,12 +3,14 @@ require 'stdlib/string'
 Biters = {}
 
 function Biters.spawn_biter(base, surface, spawner)
-    for _, unit_name in pairs(Biters.valid_units(spawner)) do
-        local odds = 100 * Biters.unit_odds(unit_name)
-        if odds > 0 and odds > math.random(100) then
-            local spawn_pos = surface.find_non_colliding_position(unit_name, spawner.position, 6, 0.5)
-            if spawn_pos then
-                return BiterBase.create_entity(base, surface, {name = unit_name, position = spawn_pos, force = 'enemy'})
+    if spawner and spawner.valid then
+        for _, unit_name in pairs(Biters.valid_units(spawner)) do
+            local odds = 100 * Biters.unit_odds(unit_name)
+            if odds > 0 and odds > math.random(100) then
+                local spawn_pos = surface.find_non_colliding_position(unit_name, spawner.position, 6, 0.5)
+                if spawn_pos then
+                    return BiterBase.create_entity(base, surface, {name = unit_name, position = spawn_pos, force = 'enemy'})
+                end
             end
         end
     end

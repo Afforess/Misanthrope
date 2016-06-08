@@ -12,6 +12,47 @@ BiterBase = {}
 BiterBase.Logger = Logger.new("Misanthrope", "biter_base", DEBUG_MODE)
 local Log = function(str, ...) BiterBase.Logger.log(string.format(str, ...)) end
 
+-- Biter Base Meta-Methods
+local Base = {}
+
+function Base.get_entities(self)
+    if self.entities then
+        return table.filter(self.entities, Game.VALID_FILTER)
+    end
+    return {}
+end
+
+function Base.get_prev_entities(self)
+    local plan_data = self.plan.data
+    if plan_data.prev_entities then
+        return table.filter(plan_data.prev_entities, Game.VALID_FILTER)
+    end
+    return {}
+end
+
+function Base.all_hives(self)
+    local hives = {}
+    table.insert(hives, self.queen)
+    for _, hive in pairs(self.hives) do
+        table.insert(hives, hive)
+    end
+    return hives
+end
+
+-- Biter Base metatable
+local BaseMt = {}
+BaseMt.__index = function(tbl, k)
+    local raw = rawget(tbl, k)
+    if raw then
+        return raw
+    else
+        if Base[k] then
+            return Base[k]
+        end
+    end
+    return nil
+end
+
 --- Creates a biter base from spawner entity
 function BiterBase.discover(entity)
     local pos = entity.position
@@ -92,7 +133,9 @@ function BiterBase.tick(base)
         BiterBase.create_plan(base)
     else
         local plan_class = BiterBase.plans[base.plan.name].class
-        if not plan_class.tick(base, base.plan.data) then
+        if plan_class.is_expired and plan_class.is_expired(base, base.plan.data) then
+            BiterBase.set_active_plan(base, 'idle')
+        elseif not plan_class.tick(base, base.plan.data) then
             BiterBase.set_active_plan(base, 'idle')
         end
     end
@@ -113,8 +156,10 @@ function BiterBase.create_plan(base)
         return true
     end
     if base.target and base.target.type == 'scent' and base.currency > BiterBase.plans.attack_area.cost then
-        --BiterBase.set_active_plan(base, 'attack_area')
-        return true
+        if #base.target.paths > 0 then
+            BiterBase.set_active_plan(base, 'attack_area')
+            return true
+        end
     end
 
     Log("%s has no active plans, and failed to choose any new plan. Idling.", BiterBase.tostring(base))
@@ -163,6 +208,33 @@ function BiterBase.create_entity(base, surface, entity_data)
     return entity
 end
 
+function BiterBase.create_unit_group(base, data)
+    if not global.unit_groups then global.unit_groups = {} end
+    local unit_group = base.queen.surface.create_unit_group(data)
+    table.insert(global.unit_groups, {unit_group, unit_group.state, game.tick, base})
+    return unit_group
+end
+
+Event.register(defines.events.on_tick, function(event)
+    if not global.unit_groups then return end
+
+    local groups = global.unit_groups
+    for i = #groups, 1, -1 do
+        local unit_group, prev_state, initial_tick, base = unpack(groups[i])
+        if unit_group.valid then
+            local current_state = unit_group.state
+            if current_state ~= prev_state then
+                game.raise_event(UNIT_GROUP_EVENT_ID, {unit_group = unit_group, current_state = current_state, prev_state = prev_state, initial_tick = initial_tick, base = base})
+                groups[i][2] = current_state
+            end
+        else
+            game.raise_event(UNIT_GROUP_EVENT_ID, {prev_state = prev_state, initial_tick = initial_tick, base = base})
+            table.remove(groups, i)
+        end
+    end
+end)
+
+
 Event.register(defines.events.on_trigger_created_entity, function(event)
     if event.entity.name == 'spawner-damaged' then
         local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
@@ -184,6 +256,9 @@ Event.register(defines.events.on_tick, function(event)
             local base = global.bases[i]
             base.currency = base.currency + 1 + #base.hives
             if base.next_tick < tick then
+                if not getmetatable(base) then
+                    setmetatable(base, BaseMt)
+                end
                 BiterBase.tick(base)
             end
         end

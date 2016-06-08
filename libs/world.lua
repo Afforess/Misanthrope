@@ -44,6 +44,19 @@ function World.migrate(old_version, new_version)
     end
 end
 
+function World.all_characters(surface)
+    local characters = {}
+    for idx, player in pairs(global.players) do
+        if player.valid and player.connected then
+            local character = player.character
+            if character and character.valid and (surface == nil or character.surface == surface) then
+                characters[idx] = character
+            end
+        end
+    end
+    return characters
+end
+
 Event.register(Event.core_events.configuration_changed, function(event)
     World.Logger.log("Setting up world...")
     World.Logger.log("Mod data: " .. serpent.line(event.data, {comment = false}))
