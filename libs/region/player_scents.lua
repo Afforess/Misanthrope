@@ -84,9 +84,27 @@ Event.register(defines.events.on_tick, function(event)
     end
 end)
 
+ADJACENT_OFFSETS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
 Event.register(defines.events.on_tick, function(event)
     local player_scents = global.player_scent_spread
-    for i = 1, 5 do
+
+    if not global.player_scent_processing_speed then
+        global.player_scent_processing_speed = 4
+    end
+
+    if event.tick % Time.MINUTE == 0 then
+        if global.prev_player_scent_depth then
+            if global.prev_player_scent_depth > player_scents.count * 1.05 then
+                global.player_scent_processing_speed = math.max(1, global.player_scent_processing_speed - 1)
+            elseif global.prev_player_scent_depth < player_scents.count * 0.95 then
+                global.player_scent_processing_speed = global.player_scent_processing_speed + 1
+            end
+        end
+        Log("Player scent depth: %d, processing speed: %d", player_scents.count, global.player_scent_processing_speed)
+        global.prev_player_scent_depth = player_scents.count
+    end
+    for i = 1, global.player_scent_processing_speed do
         if not player_scents or player_scents.count == 0 then return end
 
         local surface, chunk_pos, data, idx, visited_chunks = unpack(circular_buffer.pop(player_scents))
@@ -99,7 +117,7 @@ Event.register(defines.events.on_tick, function(event)
         data.player_scent = math.floor(math.max(0, math.floor(data.player_scent * 0.80) - math.min(data.player_scent * 0.01, 100)))
 
         if spread > 10 then
-            for idx, offset in pairs({{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) do
+            for idx, offset in pairs(ADJACENT_OFFSETS) do
                 local chunk = Position.add(chunk_pos, offset)
                 local chunk_data, chunk_idx = Chunk.get_data(surface, chunk, {})
                 local old_amt = 0

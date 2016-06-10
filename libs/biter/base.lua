@@ -141,12 +141,24 @@ function BiterBase.tick(base)
     end
 end
 
+function BiterBase.is_in_active_chunk(base)
+    local surface = base.queen.surface
+    local pos = base.queen.position
+    for _, character in pairs(World.all_characters(surface)) do
+        if Position.distance_squared(pos, character.position) < 25600 then
+            return true
+        end
+    end
+    return surface.get_pollution(pos) > 500
+end
+
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
     identify_targets = { passive = true, cost = 100, update_frequency = 300, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
     attacked_recently = { passive = false, cost = 100, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
-    alert = { passive = false, cost = 100, update_frequency = 180, class = require 'libs/biter/ai/alert' }
+    alert = { passive = false, cost = 100, update_frequency = 180, class = require 'libs/biter/ai/alert' },
+    move_base = { passive = false, cost = 500, update_frequency = 300, class = require 'libs/biter/ai/move_base' }
 }
 
 function BiterBase.create_plan(base)
@@ -155,10 +167,18 @@ function BiterBase.create_plan(base)
         BiterBase.set_active_plan(base, 'identify_targets')
         return true
     end
-    if base.target and base.target.type == 'scent' and base.currency > BiterBase.plans.attack_area.cost then
-        if #base.target.paths > 0 then
-            BiterBase.set_active_plan(base, 'attack_area')
-            return true
+
+    if base.target and base.target.type == 'scent' and #base.target.paths > 0 then
+        if BiterBase.is_in_active_chunk(base) then
+            if base.currency > BiterBase.plans.attack_area.cost then
+                BiterBase.set_active_plan(base, 'attack_area')
+                return true
+            end
+        else
+            if base.currency > BiterBase.plans.move_base.cost then
+                BiterBase.set_active_plan(base, 'move_base')
+                return true
+            end
         end
     end
 
@@ -197,6 +217,10 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
     base.plan = { name = plan_name, data = data, valid = true}
     base.currency = base.currency - plan_data.cost
     base.next_tick = game.tick + plan_data.update_frequency
+
+    if plan_data.class and plan_data.class.initialize then
+        plan_data.class.initialize(base, data)
+    end
 end
 
 function BiterBase.create_entity(base, surface, entity_data)
@@ -214,92 +238,92 @@ function BiterBase.create_unit_group(base, data)
     table.insert(global.unit_groups, {unit_group, unit_group.state, game.tick, base})
     return unit_group
 end
-
-Event.register(defines.events.on_tick, function(event)
-    if not global.unit_groups then return end
-
-    local groups = global.unit_groups
-    for i = #groups, 1, -1 do
-        local unit_group, prev_state, initial_tick, base = unpack(groups[i])
-        if unit_group.valid then
-            local current_state = unit_group.state
-            if current_state ~= prev_state then
-                game.raise_event(UNIT_GROUP_EVENT_ID, {unit_group = unit_group, current_state = current_state, prev_state = prev_state, initial_tick = initial_tick, base = base})
-                groups[i][2] = current_state
-            end
-        else
-            game.raise_event(UNIT_GROUP_EVENT_ID, {prev_state = prev_state, initial_tick = initial_tick, base = base})
-            table.remove(groups, i)
-        end
-    end
-end)
-
-
-Event.register(defines.events.on_trigger_created_entity, function(event)
-    if event.entity.name == 'spawner-damaged' then
-        local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
-        Log("Trigger entity created, chunk_data: %s", serpent.block(data, {comment = false}))
-        if data and data.base then
-            data.base.last_attacked = event.tick
-            if data.base.plan.name ~= 'attacked_recently' then
-                BiterBase.set_active_plan(data.base, 'attacked_recently')
-            end
-        end
-        event.entity.destroy()
-    end
-end)
-
-Event.register(defines.events.on_tick, function(event)
-    local tick = event.tick
-    if tick % 60 == 0 then
-        for i = 1, #global.bases do
-            local base = global.bases[i]
-            base.currency = base.currency + 1 + #base.hives
-            if base.next_tick < tick then
-                if not getmetatable(base) then
-                    setmetatable(base, BaseMt)
-                end
-                BiterBase.tick(base)
-            end
-        end
-    end
-end)
-
-Event.register(defines.events.on_chunk_generated, function(event)
-    local area = event.area
-    local surface = event.surface
-
-    -- Run one tick later to ensure compatibility with mods that are doing stuff in on_chunk_generated
-    Event.register(defines.events.on_tick, function(event)
-        Log("Chunk generated, checking area {%s} for spawners", serpent.line(area, {comment=false}))
-        for _, spawner in pairs(surface.find_entities_filtered({area = area, type = 'unit-spawner', force = game.forces.enemy})) do
-            if spawner.valid then
-                local data = Entity.get_data(spawner)
-                if not data or not data.base then
-                    BiterBase.discover(spawner)
-                end
-            end
-        end
-
-        Event.remove(defines.events.on_tick, event._handler)
-    end)
-end)
-
-Event.register(defines.events.on_entity_died, function(event)
-    local entity = event.entity
-    if entity.type == 'unit-spawner' then
-        local data = Entity.set_data(entity, nil)
-        if data and data.base then
-            local base = data.base
-            if base.queen == entity then
-                BiterBase.on_queen_death(base)
-            else
-                for i = #base.hives, 1, -1 do
-                    if base.hives[i] == entity then
-                        table.remove(base.hives, i)
-                    end
-                end
-            end
-        end
-    end
-end)
+--
+-- Event.register(defines.events.on_tick, function(event)
+--     if not global.unit_groups then return end
+--
+--     local groups = global.unit_groups
+--     for i = #groups, 1, -1 do
+--         local unit_group, prev_state, initial_tick, base = unpack(groups[i])
+--         if unit_group.valid then
+--             local current_state = unit_group.state
+--             if current_state ~= prev_state then
+--                 game.raise_event(UNIT_GROUP_EVENT_ID, {unit_group = unit_group, current_state = current_state, prev_state = prev_state, initial_tick = initial_tick, base = base})
+--                 groups[i][2] = current_state
+--             end
+--         else
+--             game.raise_event(UNIT_GROUP_EVENT_ID, {prev_state = prev_state, initial_tick = initial_tick, base = base})
+--             table.remove(groups, i)
+--         end
+--     end
+-- end)
+--
+--
+-- Event.register(defines.events.on_trigger_created_entity, function(event)
+--     if event.entity.name == 'spawner-damaged' then
+--         local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
+--         Log("Trigger entity created, chunk_data: %s", serpent.block(data, {comment = false}))
+--         if data and data.base then
+--             data.base.last_attacked = event.tick
+--             if data.base.plan.name ~= 'attacked_recently' then
+--                 BiterBase.set_active_plan(data.base, 'attacked_recently')
+--             end
+--         end
+--         event.entity.destroy()
+--     end
+-- end)
+--
+-- Event.register(defines.events.on_tick, function(event)
+--     local tick = event.tick
+--     if tick % 60 == 0 then
+--         for i = 1, #global.bases do
+--             local base = global.bases[i]
+--             base.currency = base.currency + 1 + #base.hives
+--             if base.next_tick < tick then
+--                 if not getmetatable(base) then
+--                     setmetatable(base, BaseMt)
+--                 end
+--                 BiterBase.tick(base)
+--             end
+--         end
+--     end
+-- end)
+--
+-- Event.register(defines.events.on_chunk_generated, function(event)
+--     local area = event.area
+--     local surface = event.surface
+--
+--     -- Run one tick later to ensure compatibility with mods that are doing stuff in on_chunk_generated
+--     Event.register(defines.events.on_tick, function(event)
+--         Log("Chunk generated, checking area {%s} for spawners", serpent.line(area, {comment=false}))
+--         for _, spawner in pairs(surface.find_entities_filtered({area = area, type = 'unit-spawner', force = game.forces.enemy})) do
+--             if spawner.valid then
+--                 local data = Entity.get_data(spawner)
+--                 if not data or not data.base then
+--                     BiterBase.discover(spawner)
+--                 end
+--             end
+--         end
+--
+--         Event.remove(defines.events.on_tick, event._handler)
+--     end)
+-- end)
+--
+-- Event.register(defines.events.on_entity_died, function(event)
+--     local entity = event.entity
+--     if entity.type == 'unit-spawner' then
+--         local data = Entity.set_data(entity, nil)
+--         if data and data.base then
+--             local base = data.base
+--             if base.queen == entity then
+--                 BiterBase.on_queen_death(base)
+--             else
+--                 for i = #base.hives, 1, -1 do
+--                     if base.hives[i] == entity then
+--                         table.remove(base.hives, i)
+--                     end
+--                 end
+--             end
+--         end
+--     end
+-- end)
