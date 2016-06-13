@@ -30,14 +30,10 @@ AttackArea.stages.spawning = function(base, data)
 end
 
 AttackArea.stages.plan_attack = function(base, data)
-    local surface = base.queen.surface
-
     local commands = {}
-    table.each(base.target.paths, function(path)
-        for i = 1, #path, 5 do
-            table.insert(commands, {type = defines.command.go_to_location, destination = path[i]})
-        end
-    end)
+    for i = 1, #base.target.path, 5 do
+        table.insert(commands, {type = defines.command.go_to_location, destination = base.target.path[i]})
+    end
     local end_pos = Area.center(Chunk.to_area(base.target.chunk_pos))
     table.insert(commands, {type = defines.command.attack_area, destination = end_pos, radius = 32})
     local command = {type = defines.command.compound, structure_type = defines.compoundcommandtype.return_last, commands = commands}

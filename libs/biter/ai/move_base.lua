@@ -43,17 +43,29 @@ MoveBase.stages.move = function(base, data)
         end)
 
         local new_pos = surface.find_non_colliding_position(name, offset_pos, 4, 0.1)
-        local new_entity = surface.create_entity({name = name, position = new_pos, direction = direction, force = 'enemy'})
-        if is_queen then
-            base.queen = new_entity
-        elseif type == 'unit-spawner' then
-            base.hives = table.filter(base.hives, Game.VALID_FILTER)
-            table.insert(base.hives, new_entity)
-        else
-            base.worms = table.filter(base.worms, Game.VALID_FILTER)
-            table.insert(base.worms, new_entity)
+        if new_pos then
+            local new_entity = surface.create_entity({name = name, position = new_pos, direction = direction, force = 'enemy'})
+            if is_queen then
+                base.queen = new_entity
+                local chunk_pos = Chunk.from_position(new_entity.position)
+                local old_chunk_pos = Chunk.from_position(old_pos)
+                if chunk_pos.x ~= old_chunk_pos.x or chunk_pos.y ~= old_chunk_pos.y then
+                    local old_chunk_data = Chunk.get_data(base.queen.surface, old_chunk_pos, {})
+                    old_chunk_data.base = nil
+
+                    local new_chunk_data = Chunk.get_data(base.queen.surface, chunk_pos, {})
+                    new_chunk_data.base = base
+                    Log("Moved from chunk %s to chunk %s", base, serpent.line(old_chunk_pos), serpent.line(chunk_pos))
+                end
+            elseif type == 'unit-spawner' then
+                base.hives = table.filter(base.hives, Game.VALID_FILTER)
+                table.insert(base.hives, new_entity)
+            else
+                base.worms = table.filter(base.worms, Game.VALID_FILTER)
+                table.insert(base.worms, new_entity)
+            end
+            Log("Teleported (%s) from %s to %s", base, name, serpent.line(old_pos), serpent.line(new_entity.position))
         end
-        Log("Teleported (%s) from %s to %s", base, name, serpent.line(old_pos), serpent.line(new_entity.position))
     end
     if #data.base_entities > 0 then
         return 'move'
@@ -64,7 +76,11 @@ end
 function MoveBase.initialize(base, data)
     data.stage = 'setup'
     data.start_chunk = Chunk.from_position(base.queen.position)
-    data.path = table.remove(base.target.paths, 1)
+    data.path = {}
+    local target_path = base.target.path
+    for i = 1, math.min(32, #target_path) do
+        table.insert(data.path, target_path[i])
+    end
     base.target = nil
 end
 

@@ -26,10 +26,14 @@ end
 
 Event.register(defines.events.on_tick, function(event)
     if global.pathfinding_requests and event.tick % 3 == 0 then
+        local iterations = 0
         for i, request in pairs(global.pathfinding_requests) do
             if not request.completed then
-                global.pathfinding_requests[i] = pathfinder.resume_a_star(request, 1)
-                break
+                global.pathfinding_requests[i] = pathfinder.resume_a_star(request, 3)
+                iterations = iterations + 1
+                if iterations >= 5 then
+                    break
+                end
             end
         end
     end

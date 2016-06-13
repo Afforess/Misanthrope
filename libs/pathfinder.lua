@@ -25,6 +25,8 @@
 -- SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -- ======================================================================
 
+require 'stdlib/area/tile'
+
 pathfinder = {}
 pathfinder.__index = pathfinder
 
@@ -33,24 +35,24 @@ pathfinder.__index = pathfinder
 -- If the search is not yet completed, the returned table will be { completed = false, ... }
 -- Pathfinding can be resumed with pathfinder.resume_a_star
 function pathfinder.partial_a_star(surface, start_pos, goal_pos, max_iterations, max_total_iterations)
-    start_pos = {x = math.floor(start_pos.x), y = math.floor(start_pos.y)}
-    goal_pos = {x = math.floor(goal_pos.x), y = math.floor(goal_pos.y)}
+    local start_tile = Tile.from_position(start_pos)
+    local goal_tile = Tile.from_position(goal_pos)
 
-    local surface_name = surface.name
     local closed_set = {}
-    local open_set = { start_pos }
+    local open_set = {}
+    open_set[pathfinder.node_key(start_tile)] = start_tile
     local came_from = {}
 
     local g_score = {}
     local f_score = {}
-    g_score[pathfinder.node_key(start_pos)] = 0
-    f_score[pathfinder.node_key(start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
+    g_score[pathfinder.node_key(start_tile)] = 0
+    f_score[pathfinder.node_key(start_tile)] = pathfinder.heuristic_cost_estimate(start_tile, goal_tile)
 
     local pathfinding_data =
     {
         surface = surface,
-        start_pos = start_pos,
-        goal_pos = goal_pos,
+        start_pos = start_tile,
+        goal_pos = goal_tile,
         closed_set = closed_set,
         open_set = open_set,
         came_from = came_from,
@@ -76,24 +78,24 @@ end
 
 -- Find a complete path on the given surface between the start_pos and goal_pos
 function pathfinder.a_star(surface, start_pos, goal_pos, max_total_iterations)
-    start_pos = {x = math.floor(start_pos.x), y = math.floor(start_pos.y)}
-    goal_pos = {x = math.floor(goal_pos.x), y = math.floor(goal_pos.y)}
+    local start_tile = Tile.from_position(start_pos)
+    local goal_tile = Tile.from_position(goal_pos)
 
-    local surface_name = surface.name
     local closed_set = {}
-    local open_set = { start_pos }
+    local open_set = {}
+    open_set[pathfinder.node_key(start_tile)] = start_tile
     local came_from = {}
 
     local g_score = {}
     local f_score = {}
-    g_score[pathfinder.node_key(start_pos)] = 0
-    f_score[pathfinder.node_key(start_pos)] = pathfinder.heuristic_cost_estimate(start_pos, goal_pos)
+    g_score[pathfinder.node_key(start_tile)] = 0
+    f_score[pathfinder.node_key(start_tile)] = pathfinder.heuristic_cost_estimate(start_tile, goal_tile)
 
     local pathfinding_data =
     {
         surface = surface,
-        start_pos = start_pos,
-        goal_pos = goal_pos,
+        start_pos = start_tile,
+        goal_pos = goal_tile,
         closed_set = closed_set,
         open_set = open_set,
         came_from = came_from,
@@ -113,49 +115,57 @@ function pathfinder.a_star(surface, start_pos, goal_pos, max_total_iterations)
 end
 
 function pathfinder.step_a_star(data)
-    local surface_name = data.surface.name
+    if data.iterations > data.max_total_iterations then
+        World.Logger.log(string.format("step_a_star failed, %d iterations exceeded max iterations (%d)", data.iterations, data.max_total_iterations))
+        --World.Logger.log("step_a_star state: " .. serpent.block(data))
+        data.completed = true
+        return nil
+    end
+    data.iterations = data.iterations + 1
 
-    if #data.open_set > 0 then
-        if data.iterations > data.max_total_iterations then
-            data.completed = true
-            return nil
-        end
-        data.iterations = data.iterations + 1
+    local current = pathfinder.lowest_f_score(data.open_set, data.f_score)
+    if not current then
+        World.Logger.log(string.format("step_a_star failed, %d iterations found no path to target", data.iterations))
+        --World.Logger.log("step_a_star state: " .. serpent.block(data))
+        data.completed = true
+        return nil
+    end
 
-        local current = pathfinder.lowest_f_score(surface_name, data.open_set, data.f_score)
-        if current.x == data.goal_pos.x and current.y == data.goal_pos.y then
-            local path = pathfinder.unwind_path({}, data.came_from, data.goal_pos)
-            table.insert(path, data.goal_pos)
-            data.completed = true
-            return path
-        end
+    if current.x == data.goal_pos.x and current.y == data.goal_pos.y then
+        local path = pathfinder.unwind_path({}, data.came_from, data.goal_pos)
+        table.insert(path, data.goal_pos)
+        data.completed = true
+        World.Logger.log(string.format("step_a_star completed, %d iterations ", data.iterations))
+        return path
+    end
 
-        pathfinder.remove_node(data.open_set, current)
-        table.insert(data.closed_set, current)
+    local current_key = pathfinder.node_key(current)
+    data.open_set[current_key] = nil
+    data.closed_set[current_key] = true
 
-        local neighbors = pathfinder.neighbor_nodes(data.surface, current)
-        for _, neighbor in ipairs(neighbors) do
-            if pathfinder.not_in(data.closed_set, neighbor) then
-                local tentative_g_score = data.g_score[pathfinder.node_key(current)] + pathfinder.heuristic_cost_estimate(current, neighbor)
+    local neighbors = pathfinder.neighbor_nodes(data.surface, current)
+    for _, neighbor in pairs(neighbors) do
+        local key = pathfinder.node_key(neighbor)
+        if not data.closed_set[key] then
+            local tentative_g_score = data.g_score[current_key] + pathfinder.heuristic_cost_estimate(current, neighbor)
 
-                local neighbor_key = pathfinder.node_key(neighbor)
-                if pathfinder.not_in(data.open_set, neighbor) or tentative_g_score < data.g_score[neighbor_key] then
-                    data.came_from[neighbor_key] = current
-                    data.g_score[neighbor_key] = tentative_g_score
-                    data.f_score[neighbor_key] = data.g_score[neighbor_key] + pathfinder.heuristic_cost_estimate(neighbor, data.goal_pos)
-                    if pathfinder.not_in(data.open_set, neighbor) then
-                        table.insert(data.open_set, neighbor)
-                    end
+            local neighbor_key = pathfinder.node_key(neighbor)
+            if not data.open_set[key] or tentative_g_score < data.g_score[neighbor_key] then
+                data.came_from[neighbor_key] = current
+                data.g_score[neighbor_key] = tentative_g_score
+                data.f_score[neighbor_key] = data.g_score[neighbor_key] + pathfinder.heuristic_cost_estimate(neighbor, data.goal_pos)
+                if not data.open_set[key] then
+                    data.open_set[key] = neighbor
                 end
             end
         end
     end
-
-    return nil
 end
 
 function pathfinder.node_key(pos)
-    return string.format("%s,%s", pos.x, pos.y)
+    local key = bit32.bor(bit32.lshift(bit32.band(pos.x, 0xFFFF), 16), bit32.band(pos.y, 0xFFFF))
+    --World.Logger.log(string.format("%s - %d", serpent.line(pos), key))
+    return key
 end
 
 function pathfinder.heuristic_cost_estimate(nodeA, nodeB)
@@ -163,15 +173,6 @@ function pathfinder.heuristic_cost_estimate(nodeA, nodeB)
     --local ayby = nodeA.y - nodeB.y
     --return math.sqrt(axbx * axbx + ayby * ayby)
     return math.abs(nodeB.x - nodeA.x) + math.abs(nodeB.y - nodeA.y)
-end
-
-function pathfinder.not_in(set, current_node)
-    for _, node in ipairs(set) do
-        if node.x == current_node.x and node.y == current_node.y then
-            return false
-        end
-    end
-    return true
 end
 
 function pathfinder.neighbor_nodes(surface, center_node)
@@ -185,16 +186,6 @@ function pathfinder.neighbor_nodes(surface, center_node)
     return neighbors
 end
 
-function pathfinder.remove_node(set, to_remove)
-    for i, node in ipairs(set) do
-        if node.x == to_remove.x and node.y == to_remove.y then
-            set[i] = set[#set]
-            set[#set] = nil
-            break
-        end
-    end
-end
-
 function pathfinder.unwind_path(flat_path, map, current_node)
     local map_value = map[pathfinder.node_key(current_node)]
     if map_value then
@@ -205,10 +196,10 @@ function pathfinder.unwind_path(flat_path, map, current_node)
     end
 end
 
-function pathfinder.lowest_f_score(surface_name, set, f_score)
+function pathfinder.lowest_f_score(set, f_score)
     local lowest, best_node = nil, nil
-    for _, node in ipairs(set) do
-        local score = f_score[pathfinder.node_key(node)]
+    for key, node in pairs(set) do
+        local score = f_score[key]
         if lowest == nil or score < lowest then
             lowest, best_node = score, node
         end

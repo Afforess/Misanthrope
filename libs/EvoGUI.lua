@@ -34,19 +34,19 @@ function EvoGUI.create_biter_scent_text()
     return "Biter Scent: 0"
 end
 
-function EvoGUI.create_player_scent_text()
+function EvoGUI.create_chunk_value_text()
     local player = game.players[1]
     if player and player.valid and player.connected then
         local character = player.character
         if character and character.valid then
             local pos = character.position
             local data = Chunk.get_data(character.surface, Chunk.from_position(pos))
-            if data and data.player_scent then
-                return "Player Scent: " .. data.player_scent
+            if data and data.player_value then
+                return "Chunk Value: " .. data.player_value
             end
         end
     end
-    return "Player Scent: 0"
+    return "Chunk Value: 0"
 end
 
 function EvoGUI.create_evolution_rate_color()
@@ -80,9 +80,9 @@ function EvoGUI.setup()
 
             remote.call("EvoGUI", "create_remote_sensor", {
                 mod_name = "Misanthrope",
-                name = "player_scent",
-                text = "Player Scent:",
-                caption = "Player Scent"
+                name = "chunk_value",
+                text = "Chunk Value:",
+                caption = "Chunk Value"
             })
         end
         EvoGUI.update_gui()
@@ -109,7 +109,7 @@ function EvoGUI.update_gui()
     remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", EvoGUI.create_evolution_rate_text(), EvoGUI.create_evolution_rate_color())
     if DEBUG_MODE then
         remote.call("EvoGUI", "update_remote_sensor", "biter_scent", EvoGUI.create_biter_scent_text())
-        remote.call("EvoGUI", "update_remote_sensor", "player_scent", EvoGUI.create_player_scent_text())
+        remote.call("EvoGUI", "update_remote_sensor", "chunk_value", EvoGUI.create_chunk_value_text())
     end
 end
 

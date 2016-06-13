@@ -27,6 +27,6 @@ require 'libs/world'
 require 'libs/map_settings'
 require 'libs/harpa'
 require 'libs/region/biter_scents'
-require 'libs/region/player_scents'
+require 'libs/region/chunk_value'
 
 LOGGER = Logger.new("Misanthrope", "main", DEBUG_MODE)

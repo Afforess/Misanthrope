@@ -37,10 +37,10 @@ function RandomName.get_random_consonant()
 end
 
 function RandomName.generate_random_word(max_length)
-    local letter = ""
     local str = ""
     local length = math.max(4, math.random(max_length))
     for i = 1, length do
+        local letter = ""
         local r = math.random(1000)
         if i == 1 then r = r * 2 end
         if (r < 381) then

@@ -6,10 +6,8 @@ require 'stdlib/area/tile'
 Event.register(defines.events.on_entity_died, function(event)
     local entity = event.entity
     local max_health = entity.prototype.max_health
-    local position = entity.position
+    local position = Tile.from_position(entity.position)
     local surface = entity.surface
-    local entity_x = math.floor(position.x)
-    local entity_y = math.floor(position.y)
 
     local radius = math.floor(math.min(32, math.max(5, math.sqrt(max_health))))
     local area = Position.expand_to_area(position, radius)

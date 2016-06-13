@@ -2,6 +2,7 @@ require 'defines'
 require 'stdlib/event/event'
 
 Harpa = {}
+Harpa.Logger = Logger.new("Misanthrope", "harpa", DEBUG_MODE)
 
 function Harpa.migrate(old_global)
     for _, field_name in pairs({"harpa_list", "idle_harpa_list", "unpowered_harpa_list", "biter_ignore_list", "harpa_overlays"}) do
@@ -278,7 +279,6 @@ function Harpa.is_powered(entity, ignore_entity)
             local range = ranges_squared[electric_pole.prototype.name]
 
             local pole_pos = electric_pole.position
-            local dist_squared = (position.x - pole_pos.x) * (position.x - pole_pos.x) + (position.y - pole_pos.y) * (position.y - pole_pos.y)
             if range ~= nil and Harpa.is_inside_area(Harpa.area_around(pole_pos, range), position) then
                 return true
             end
@@ -344,7 +344,7 @@ function Harpa.tick_emitter(entity, radius)
             end
              local status, err = pcall(biter.set_command, command)
              if not status then
-                LOGGER.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
+                Harpa.Logger.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end
