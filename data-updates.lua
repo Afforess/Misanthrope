@@ -36,3 +36,19 @@ data.raw["unit"]["small-spitter"].pollution_to_join_attack = 50
 data.raw["unit"]["medium-spitter"].pollution_to_join_attack = 100
 data.raw["unit"]["big-spitter"].pollution_to_join_attack = 200
 data.raw["unit"]["behemoth-spitter"].pollution_to_join_attack = 1000
+
+for key, prototype_type in pairs(data.raw) do
+    for name, prototype in pairs(prototype_type) do
+        if prototype.energy_source then
+            if prototype.energy_source.emissions and prototype.energy_source.emissions > 0.001 then
+                if name == 'assembling-machine-2' or name == 'assembling-machine-3' then
+                    prototype.energy_source.emissions = prototype.energy_source.emissions * 8
+                else
+                    prototype.energy_source.emissions = prototype.energy_source.emissions * 5
+                end
+            end
+        elseif key == 'inserter' then
+            prototype.energy_source.emissions = 0.002
+        end
+    end
+end
