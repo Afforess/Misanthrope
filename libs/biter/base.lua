@@ -163,16 +163,15 @@ function BiterBase.is_in_active_chunk(base)
             return true
         end
     end
-    return surface.get_pollution(pos) > 500
+    return surface.get_pollution(pos) > 100
 end
 
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
-    identify_targets = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/identify_targets' },
-    attack_area = { passive = false, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
-    attacked_recently = { passive = false, cost = 100, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
-    alert = { passive = false, cost = 100, update_frequency = 180, class = require 'libs/biter/ai/alert' },
-    move_base = { passive = false, cost = 500, update_frequency = 300, class = require 'libs/biter/ai/move_base' }
+    identify_targets = { passive = true, cost = 600, update_frequency = 300, class = require 'libs/biter/ai/identify_targets' },
+    attack_area = { passive = false, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
+    attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
+    alert = { passive = false, cost = 120, update_frequency = 180, class = require 'libs/biter/ai/alert' },
 }
 
 function BiterBase.create_plan(base)
@@ -186,11 +185,6 @@ function BiterBase.create_plan(base)
         if BiterBase.is_in_active_chunk(base) then
             if base.currency > BiterBase.plans.attack_area.cost then
                 BiterBase.set_active_plan(base, 'attack_area')
-                return true
-            end
-        else
-            if base.currency > BiterBase.plans.move_base.cost then
-                BiterBase.set_active_plan(base, 'move_base')
                 return true
             end
         end

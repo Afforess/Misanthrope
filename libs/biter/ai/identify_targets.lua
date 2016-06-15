@@ -26,7 +26,9 @@ IdentifyTargets.stages.search = function(base, data)
 
     local chunk_data = Chunk.get_data(base.queen.surface, chunk_pos)
     if chunk_data and chunk_data.player_value and chunk_data.player_value > 0 then
-        value = chunk_data.player_value / (1 + Position.manhattan_distance(chunk_pos, data.start_chunk))
+        local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
+
+        value = chunk_data.player_value / ((1 + dist) * (1 + dist))
         table.insert(data.candidates, { chunk_pos = chunk_pos, data = chunk_data, value = value})
     end
 
@@ -47,57 +49,14 @@ IdentifyTargets.stages.sort = function(base, data)
 
     Log("All candidates: %s", base, serpent.block(data.candidates))
 
-    return 'pathfind'
-end
-
-IdentifyTargets.stages.pathfind = function(base, data)
-    if data.path_finding.idx > #data.candidates then
-        return 'decide'
-    end
-
-    local candidate = data.candidates[data.path_finding.idx]
-    local end_pos = Area.center(Chunk.to_area(candidate.chunk_pos))
-    data.path_finding.path_id = PathfindingEngine.request_path(base.queen.surface, base.queen.position, end_pos, 50000)
-    return 'wait_for_path'
-end
-
-IdentifyTargets.stages.wait_for_path = function(base, data)
-    local path_id = data.path_finding.path_id
-    if not PathfindingEngine.is_path_complete(path_id) then
-        return 'wait_for_path'
-    end
-
-    local result = PathfindingEngine.retreive_path(path_id)
-    if result.path then
-        local candidate = data.candidates[data.path_finding.idx]
-        candidate.path = result.path
-        Log("Found path for candidate chunk (%s)", base, serpent.line(candidate.chunk_pos))
-        return 'decide'
-    end
-
-    data.path_finding.idx = data.path_finding.idx + 1
-    return 'pathfind'
+    return 'decide'
 end
 
 IdentifyTargets.stages.decide = function(base, data)
-    local path_candidates = table.filter(data.candidates, function(candidate)
-        return candidate.path ~= nil
-    end)
-
-    table.sort(path_candidates, function(a, b)
-        local a_value = a.data.player_value
-        local b_value = b.data.player_value
-        return b_value < a_value
-    end)
-
-    if #path_candidates == 0 then
-        return 'fail'
-    end
-
-    local idx = math.random(#path_candidates)
-    local choosen_candidate = path_candidates[idx]
+    local idx = math.random(#data.candidates)
+    local choosen_candidate = data.candidates[idx]
     Log("Randomly chosen candidate was %s", base, serpent.line(choosen_candidate))
-    base.target = { type = 'player_value', chunk_pos = choosen_candidate.chunk_pos, path = choosen_candidate.path }
+    base.target = { type = 'player_value', chunk_pos = choosen_candidate.chunk_pos}
     return 'success'
 end
 

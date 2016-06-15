@@ -30,17 +30,12 @@ AttackArea.stages.spawning = function(base, data)
 end
 
 AttackArea.stages.plan_attack = function(base, data)
-    local commands = {}
-    for i = 1, #base.target.path, 5 do
-        table.insert(commands, {type = defines.command.go_to_location, destination = base.target.path[i]})
-    end
     local end_pos = Area.center(Chunk.to_area(base.target.chunk_pos))
-    table.insert(commands, {type = defines.command.attack_area, destination = end_pos, radius = 32})
-    local command = {type = defines.command.compound, structure_type = defines.compoundcommandtype.return_last, commands = commands}
-    Log("Command contents: %s", base, serpent.line(command))
+    local command = {type = defines.command.attack_area, destination = end_pos, radius = 16}
+    local entities = table.filter(base.entities, Game.VALID_FILTER)
 
-    local unit_group = BiterBase.create_unit_group(base, {position = base.entities[1].position, force = 'enemy'})
-    for _, biter in pairs(base.entities) do
+    local unit_group = BiterBase.create_unit_group(base, {position = entities[1].position, force = 'enemy'})
+    for _, biter in pairs(entities) do
         if biter.unit_group and biter.unit_group.valid then
             biter.unit_group.destroy()
         end

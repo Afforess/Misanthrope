@@ -66,11 +66,6 @@ function World.resync_players()
     end
 end
 
-
-Event.register(defines.events.on_sector_scanned, function(event)
-    Log("Radar at %s scanned: %s", serpent.line(event.radar.position), serpent.line(event))
-end)
-
 Event.register(defines.events.on_player_created, World.resync_players)
 
 Event.register(Event.core_events.configuration_changed, function(event)

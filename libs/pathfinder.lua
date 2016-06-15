@@ -169,9 +169,6 @@ function pathfinder.node_key(pos)
 end
 
 function pathfinder.heuristic_cost_estimate(nodeA, nodeB)
-    --local axbx = nodeA.x - nodeB.x
-    --local ayby = nodeA.y - nodeB.y
-    --return math.sqrt(axbx * axbx + ayby * ayby)
     return math.abs(nodeB.x - nodeA.x) + math.abs(nodeB.y - nodeA.y)
 end
 
