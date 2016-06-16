@@ -11,5 +11,9 @@ Event.register(defines.events.on_tick, function(event)
         map_settings.pollution.diffusion_ratio = 0.05
         map_settings.pollution.min_to_diffuse = 10
         map_settings.pollution.expected_max_per_chunk = 6000
+
+        map_settings.enemy_evolution.enabled = true
+        map_settings.enemy_evolution.time_factor = 0.000008
+        map_settings.enemy_evolution.pollution_factor = 0.000003
     end
 end)
