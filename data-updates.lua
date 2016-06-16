@@ -1,3 +1,4 @@
+require 'stdlib/string'
 
 for _, prototype in pairs(data.raw["unit-spawner"]) do
     prototype.pollution_absorbtion_absolute = prototype.pollution_absorbtion_absolute / 10
@@ -41,7 +42,7 @@ for key, prototype_type in pairs(data.raw) do
     for name, prototype in pairs(prototype_type) do
         if prototype.energy_source then
             if prototype.energy_source.emissions and prototype.energy_source.emissions > 0.001 then
-                if name == 'assembling-machine-2' or name == 'assembling-machine-3' then
+                if name:contains('assembling-machine') and not name == 'assembling-machine-1' then
                     prototype.energy_source.emissions = prototype.energy_source.emissions * 8
                 else
                     prototype.energy_source.emissions = prototype.energy_source.emissions * 5

@@ -39,6 +39,23 @@ function Base.all_hives(self)
     return hives
 end
 
+function Base.wanted_hive_count(self)
+    return math.max(0, 1 + (game.evolution_factor / 10) - #self:all_hives())
+end
+
+function Base.wanted_worm_count(self)
+    local alert_count = 0
+    if self.history['alert'] then
+        alert_count = alert_count + self.history['alert']
+    end
+
+    return math.max(0, 1 + alert_count - #self.worms)
+end
+
+function Base.can_afford(self, plan)
+    return self.currency >= BiterBase.plans[plan].cost
+end
+
 -- Biter Base metatable
 local BaseMt = {}
 BaseMt.__index = function(tbl, k)
@@ -59,7 +76,7 @@ function BiterBase.discover(entity)
     local surface = entity.surface
 
     -- initialize biter base data structure
-    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), valid = true}
+    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}, valid = true}
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
     local chunk_data = Chunk.get_data(surface, Chunk.from_position(pos), {})
@@ -168,29 +185,38 @@ end
 
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
-    identify_targets = { passive = true, cost = 600, update_frequency = 300, class = require 'libs/biter/ai/identify_targets' },
+    identify_targets = { passive = true, cost = 600, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
     attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
     alert = { passive = false, cost = 120, update_frequency = 180, class = require 'libs/biter/ai/alert' },
+    grow_hive = { passive = true, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/grow_hive' },
+    build_worm = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/build_worm' },
 }
 
 function BiterBase.create_plan(base)
-    if not base.target and base.currency > BiterBase.plans.identify_targets.cost then
+    if not base.target and base:can_afford('identify_targets') then
         Log("%s has no active targets, and chooses AI plan to identify targets", BiterBase.tostring(base))
         BiterBase.set_active_plan(base, 'identify_targets')
         return true
     end
 
-    if base.target and base.target.type == 'player_value' then
+    if base:wanted_hive_count() > 0 and base:can_afford('grow_hive') then
+        BiterBase.set_active_plan(base, 'grow_hive')
+        return true
+    end
+
+    if base:wanted_worm_count() > 0 and base:can_afford('build_worm') and math.random(100) > 70 then
+        BiterBase.set_active_plan(base, 'build_worm')
+        return true
+    end
+
+    if base:can_afford('attack_area') and base.target and base.target.type == 'player_value' then
         if BiterBase.is_in_active_chunk(base) then
-            if base.currency > BiterBase.plans.attack_area.cost then
-                BiterBase.set_active_plan(base, 'attack_area')
-                return true
-            end
+            BiterBase.set_active_plan(base, 'attack_area')
+            return true
         end
     end
 
-    Log("%s has no active plans, and failed to choose any new plan. Idling.", BiterBase.tostring(base))
     BiterBase.set_active_plan(base, 'idle')
     return false
 end
@@ -225,6 +251,11 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
     base.plan = { name = plan_name, data = data, valid = true}
     base.currency = base.currency - plan_data.cost
     base.next_tick = game.tick + plan_data.update_frequency
+    if base.history[plan_name] then
+        base.history[plan_name] = base.history[plan_name] + 1
+    else
+        base.history[plan_name] = 1
+    end
 
     if plan_data.class and plan_data.class.initialize then
         plan_data.class.initialize(base, data)

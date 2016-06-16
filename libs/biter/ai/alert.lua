@@ -1,6 +1,6 @@
 
 local Alert = {}
-local Log = function(str, ...) BiterBase.Logger.log(string.format(str, ...)) end
+local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[Alert] - (" .. base.name .. "): " .. str, ...)) end
 
 function Alert.tick(base, data)
     if #base:get_entities() < 15 then

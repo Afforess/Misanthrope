@@ -34,9 +34,19 @@ function World.entity_value(entity)
     if entity.type:contains('turret') then
         value = -1 * game.entity_prototypes[entity_name].max_health
         adj_value = value / 2
-        Log("Turret %s value is %d", entity.name, value)
     elseif BITER_TARGETS[entity_name] then
         value = BITER_TARGETS[entity_name].value
+    elseif entity.type:contains('electric-pole') then
+        value = game.entity_prototypes[entity_name].max_health
+    elseif entity.type:contains('roboport') then
+        value = game.entity_prototypes[entity_name].max_health / 8
+    elseif entity.type:contains('transport-belt') then
+        value = game.entity_prototypes[entity_name].max_health / 2
+    elseif entity.type:contains('container') then
+        value = game.entity_prototypes[entity_name].max_health / 3
+    end
+    if value ~= 0 then
+        Log("Entity %s value is %d", entity.name, value)
     end
     return value, adj_value
 end
