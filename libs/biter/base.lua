@@ -10,7 +10,20 @@ require 'libs/biter/biter'
 
 BiterBase = {}
 BiterBase.Logger = Logger.new("Misanthrope", "biter_base", DEBUG_MODE)
+BiterBase.AILoggers = {}
+
 local Log = function(str, ...) BiterBase.Logger.log(string.format(str, ...)) end
+local LogAI = function (str, base, ...)
+    if not base then
+        error("Missing base", 2)
+    end
+    local logger = BiterBase.AILoggers[base.name]
+    if not logger then
+        logger = Logger.new("Misanthrope", "ai/" .. base.name, DEBUG_MODE)
+        BiterBase.AILoggers[base.name] = logger
+    end
+    logger.log(string.format(str, ...))
+end
 
 -- Biter Base Meta-Methods
 local Base = {}
@@ -40,7 +53,7 @@ function Base.all_hives(self)
 end
 
 function Base.wanted_hive_count(self)
-    return math.max(0, 1 + (game.evolution_factor / 10) - #self:all_hives())
+    return math.max(0, 1 + (game.evolution_factor / 0.1) - #self:all_hives())
 end
 
 function Base.wanted_worm_count(self)
@@ -186,7 +199,7 @@ end
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
     identify_targets = { passive = true, cost = 600, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
-    attack_area = { passive = false, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
+    attack_area = { passive = false, cost = 3000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
     attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
     alert = { passive = false, cost = 120, update_frequency = 180, class = require 'libs/biter/ai/alert' },
     grow_hive = { passive = true, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/grow_hive' },
@@ -194,24 +207,37 @@ BiterBase.plans = {
 }
 
 function BiterBase.create_plan(base)
+    LogAI("", base)
+    LogAI("--------------------------------------------------", base)
+    LogAI("Choosing new plan, currency: %s", base, serpent.line(base.currency))
+    LogAI("Current Number of Hives in Base: %d", base, #base:all_hives())
+    LogAI("Current Number of Worms in Base: %d", base, #base.worms)
+
     if not base.target and base:can_afford('identify_targets') then
-        Log("%s has no active targets, and chooses AI plan to identify targets", BiterBase.tostring(base))
+        LogAI("No active targets, chooses AI plan to identify targets", base)
         BiterBase.set_active_plan(base, 'identify_targets')
         return true
     end
 
-    if base:wanted_hive_count() > 0 and base:can_afford('grow_hive') then
+    local wanted_hives = base:wanted_hive_count()
+    LogAI("Wanted new hives: %d", base, wanted_hives)
+    if wanted_hives > 0 and base:can_afford('grow_hive') then
         BiterBase.set_active_plan(base, 'grow_hive')
         return true
     end
 
-    if base:wanted_worm_count() > 0 and base:can_afford('build_worm') and math.random(100) > 70 then
+    local wanted_worms = base:wanted_worm_count()
+    LogAI("Wanted new worms: %d", base, wanted_worms)
+    if wanted_worms > 0 and base:can_afford('build_worm') and math.random(100) > 70 then
         BiterBase.set_active_plan(base, 'build_worm')
         return true
     end
 
     if base:can_afford('attack_area') and base.target and base.target.type == 'player_value' then
-        if BiterBase.is_in_active_chunk(base) then
+        local active_chunk = BiterBase.is_in_active_chunk(base)
+        LogAI("Is in an active chunk: ", base, serpent.line(active_chunk))
+
+        if active_chunk then
             BiterBase.set_active_plan(base, 'attack_area')
             return true
         end
@@ -243,9 +269,9 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
         end
     end
     if old_plan then
-        Log("Biters at %s change AI plan from {%s} to {%s}", BiterBase.tostring(base), base.plan.name, plan_name)
+        LogAI("Changing AI plan from {%s} to {%s}", base, base.plan.name, plan_name)
     else
-        Log("Biters at %s change AI plan to {%s}", BiterBase.tostring(base), plan_name)
+        LogAI("Switching AI plan to {%s}", base, plan_name)
     end
 
     base.plan = { name = plan_name, data = data, valid = true}
