@@ -1,6 +1,6 @@
 
 local GrowHive = {stages = {}}
-local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[GrowHive] - (" .. base.name .. "): " .. str, ...)) end
+local Log = function(str, ...) BiterBase.LogAI("[GrowHive] " .. str, ...) end
 
 GrowHive.stages.clear_trees = function(base, data)
     local surface = base.queen.surface
@@ -16,9 +16,10 @@ GrowHive.stages.build_hive = function(base, data)
     local pos = base.queen.position
     local entity_pos = surface.find_non_colliding_position(data.hive_type, pos, data.search_distance, 0.5)
     if entity_pos and Position.distance(pos, entity_pos) <= data.search_distance then
-        local hive = surface.create_entity({name = data.hive_type, position = entity_pos, force = base.queen.force})
+        local hive = surface.create_entity({name = data.hive_type, position = entity_pos, direction = math.random(7), force = base.queen.force})
         table.insert(base.hives, hive)
         Log("Successfully spawned a new hive at %s", base, serpent.line(hive.position))
+        game.evolution_factor = game.evolution_factor - 0.0025
         return 'success'
     end
 

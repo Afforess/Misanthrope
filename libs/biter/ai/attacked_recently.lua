@@ -1,6 +1,6 @@
 
 local AttackedRecently = {}
-local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[AttackedRecently] - (" .. base.name .. "): " .. str, ...)) end
+local Log = function(str, ...) BiterBase.LogAI("[AttackedRecently] " .. str, ...) end
 
 function AttackedRecently.tick(base, data)
     if #base:get_entities() < 30 then

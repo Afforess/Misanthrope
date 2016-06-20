@@ -1,6 +1,6 @@
 
 local AttackArea = {stages = {}}
-local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[AttackArea] - (" .. base.name .. "): " .. str, ...)) end
+local Log = function(str, ...) BiterBase.LogAI("[AttackArea] " .. str, ...) end
 
 AttackArea.stages.attacking = function(base, data)
     return 'attacking'
@@ -62,7 +62,7 @@ function AttackArea.tick(base, data)
 end
 
 function AttackArea.is_expired(base, data)
-    return data.attack_group and (not data.attack_group.valid or game.tick > data.attack_tick + Time.MINUTE * 3)
+    return data.attack_group and (not data.attack_group.valid or game.tick > data.attack_tick + Time.MINUTE * 6)
 end
 
 return AttackArea

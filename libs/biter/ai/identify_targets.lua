@@ -1,11 +1,11 @@
 require 'libs/pathfinding_engine'
 
 local IdentifyTargets = {stages = {}}
-local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[IdentifyTargets] - (" .. base.name .. "): " .. str, ...)) end
+local Log = function(str, ...) BiterBase.LogAI("[IdentifyTargets] " .. str, ...) end
 
 IdentifyTargets.stages.setup = function(base, data)
     local chunk_pos = Chunk.from_position(base.queen.position)
-    local search_area = Position.expand_to_area(chunk_pos, 12)
+    local search_area = Position.expand_to_area(chunk_pos, 15)
     data.start_chunk = chunk_pos
     data.search_queue = {}
     data.search_idx = 1
@@ -42,9 +42,7 @@ IdentifyTargets.stages.sort = function(base, data)
         return 'fail'
     end
     table.sort(data.candidates, function(a, b)
-        local a_value = a.value
-        local b_value = b.value
-        return b_value < a_value
+        return b.value < a.value
     end)
 
     Log("All candidates: %s", base, serpent.block(data.candidates))
@@ -56,7 +54,7 @@ IdentifyTargets.stages.decide = function(base, data)
     local idx = math.random(#data.candidates)
     local choosen_candidate = data.candidates[idx]
     Log("Randomly chosen candidate was %s", base, serpent.line(choosen_candidate))
-    base.target = { type = 'player_value', chunk_pos = choosen_candidate.chunk_pos}
+    base.target = { type = 'player_value', chunk_pos = choosen_candidate.chunk_pos, tick = game.tick}
     return 'success'
 end
 

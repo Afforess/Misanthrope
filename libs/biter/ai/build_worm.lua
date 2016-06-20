@@ -1,6 +1,6 @@
 
 local BuildWorm = {stages = {}}
-local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[BuildWorm] - (" .. base.name .. "): " .. str, ...)) end
+local Log = function(str, ...) BiterBase.LogAI("[BuildWorm] " .. str, ...) end
 
 BuildWorm.stages.clear_trees = function(base, data)
     local surface = base.queen.surface
@@ -19,6 +19,7 @@ BuildWorm.stages.build_worm = function(base, data)
         local worm = surface.create_entity({name = data.worm_type, position = entity_pos, force = base.queen.force})
         table.insert(base.worms, worm)
         Log("Successfully spawned a new worm at %s", base, serpent.line(worm.position))
+        game.evolution_factor = game.evolution_factor - 0.001
         return 'success'
     end
 
