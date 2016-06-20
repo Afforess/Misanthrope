@@ -7,12 +7,8 @@ require 'stdlib/table'
 require 'stdlib/game'
 
 Overmind = {stages = {}, tick_rates = {}}
-Overmind.Logger = Logger.new("Misanthrope", "overmind", DEBUG_MODE)
+Overmind.Logger = Logger.new("Misanthrope", "overmind", false)
 local Log = function(str, ...) Overmind.Logger.log(string.format(str, ...)) end
-
-Event.register({defines.events.on_entity_built, defines.events.on_robot_built_entity}, function(event)
-
-end)
 
 Event.register(defines.events.on_tick, function(event)
     if not global.overmind then
@@ -21,10 +17,12 @@ Event.register(defines.events.on_tick, function(event)
     if not (event.tick % global.overmind.tick_rate == 0) then return end
 
     -- accrue a tiny amount of currency due to the passage of time
-    if not global.bases or #global.bases < 3 then
-        global.overmind.currency = global.overmind.currency + 100
-    else
-        global.overmind.currency = global.overmind.currency + 10
+    if event.tick % 600 == 0 then
+        if not global.bases or #global.bases < 3 then
+            global.overmind.currency = global.overmind.currency + 100
+        else
+            global.overmind.currency = global.overmind.currency + 10
+        end
     end
 
     -- clear out any tracked entities that have expired their max_age
@@ -50,7 +48,7 @@ Event.register(defines.events.on_tick, function(event)
     end
 end)
 
-Overmind.tick_rates.setup = 600
+Overmind.tick_rates.setup = Time.SECOND * 10
 Overmind.stages.setup = function(data)
     local chunks = global.overmind.chunks
     for chunk in game.surfaces.nauvis.get_chunks() do
@@ -60,7 +58,7 @@ Overmind.stages.setup = function(data)
     return 'scan_chunk'
 end
 
-Overmind.tick_rates.decide = 600
+Overmind.tick_rates.decide = Time.SECOND * 10
 Overmind.stages.decide = function(data)
     if #global.overmind.valuable_chunks > 0 then
         Log("Overmind currency: %d", math.floor(global.overmind.currency))
@@ -98,6 +96,15 @@ Overmind.stages.spawn_biters = function(data)
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
     local surface = global.overmind.surface
+
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
+        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+        return 'decide'
+    end
+    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
+        Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
+        return 'decide'
+    end
 
     local max_age = game.tick + Time.MINUTE * 10
     local attack_group_size = math.floor(10 + game.evolution_factor / 0.025)
@@ -152,9 +159,18 @@ Overmind.stages.spread_spawner = function(data)
     global.overmind.valuable_chunks = table.filter(global.overmind.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
     Log("Choose chunk %s to spawn a new base, remaining valuable chunks: %d", serpent.line(chunk), #global.overmind.valuable_chunks)
 
-    local area = Chunk.to_area(chunk)
-    local chunk_center = Area.center(area)
     local surface = global.overmind.surface
+    local area = Chunk.to_area(chunk)
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
+        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+        return 'decide'
+    end
+    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
+        Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
+        return 'decide'
+    end
+
+    local chunk_center = Area.center(area)
     local pos = surface.find_non_colliding_position('biter-spawner', chunk_center, 16, 1)
     if pos and Area.inside(area, pos) then
         local queen = surface.create_entity({name = 'biter-spawner', position = pos, direction = math.random(7)})
@@ -167,7 +183,7 @@ Overmind.stages.spread_spawner = function(data)
     return 'decide'
 end
 
-Overmind.tick_rates.scan_chunk = 5
+Overmind.tick_rates.scan_chunk = 6
 Overmind.stages.scan_chunk = function(data)
     if #global.overmind.chunks == 0 then
         return 'decide'
@@ -181,8 +197,12 @@ Overmind.stages.scan_chunk = function(data)
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
 
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 0 then
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
         Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+        return 'scan_chunk'
+    end
+    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
+        Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
         return 'scan_chunk'
     end
 
@@ -222,41 +242,46 @@ end
 
 Overmind.tick_rates.evaluate_base = 1
 Overmind.stages.evaluate_base = function(data)
-    for i = 1, 25 do
-        if #data.adjacent == 0 then
-            local value = math.floor(data.value)
-            local nearby_bases = data.nearby_bases
-            value = (value * 6) / (1 + nearby_bases)
-            if value > 1000 then
-                Log("Finished evaluating chunk %s, its value is %d", serpent.line(data.chunk), value)
-                table.insert(global.overmind.valuable_chunks, { chunk = data.chunk, value = value, spawn = data.spawn, best_target = data.best })
-            else
-                --Log("Finished evaluating chunk %s, its value was too low (%d)", serpent.line(data.chunk), value)
-            end
-            data.reset = true
-            return 'scan_chunk'
+    if #data.adjacent == 0 then
+        local value = math.floor(data.value)
+        local nearby_bases = data.nearby_bases
+        value = (value * 6) / (1 + nearby_bases)
+        if value > 1000 then
+            Log("Finished evaluating chunk %s, its value is %d", serpent.line(data.chunk), value)
+            table.insert(global.overmind.valuable_chunks, { chunk = data.chunk, value = value, spawn = data.spawn, best_target = data.best })
+        else
+            --Log("Finished evaluating chunk %s, its value was too low (%d)", serpent.line(data.chunk), value)
         end
-        local surface = global.overmind.surface
+        data.reset = true
+        return 'scan_chunk'
+    end
 
-        local adj_chunk = table.remove(data.adjacent)
-        local chunk_data = Chunk.get_data(surface, adj_chunk)
-        if chunk_data then
-            if chunk_data.player_value then
-                data.value = data.value + chunk_data.player_value
+    local surface = global.overmind.surface
+    local adjacent_chunks = data.adjacent
+    local limit = math.max(1, #adjacent_chunks - 50)
+    for i = #adjacent_chunks, limit, -1 do
+        local adj_chunk = adjacent_chunks[i]
+        adjacent_chunks[i] = nil
+        if adj_chunk then
+            local chunk_data = Chunk.get_data(surface, adj_chunk)
+            if chunk_data then
+                if chunk_data.player_value then
+                    data.value = data.value + chunk_data.player_value
 
-                if chunk_data.player_value > data.best.value then
-                    data.best.value = chunk_data.player_value
-                    data.best.chunk = adj_chunk
+                    if chunk_data.player_value > data.best.value then
+                        data.best.value = chunk_data.player_value
+                        data.best.chunk = adj_chunk
+                    end
                 end
-            end
-            if chunk_data.base then
-                if chunk_data.base.valid then
-                    data.nearby_bases = data.nearby_bases + 1
-                else
-                    chunk_data.base = nil
-                    -- remove chunk data if no entries remain
-                    if next(chunk_data) == nil then
-                        Chunk.set_data(surface, adj_chunk, nil)
+                if chunk_data.base then
+                    if chunk_data.base.valid then
+                        data.nearby_bases = data.nearby_bases + 1
+                    else
+                        chunk_data.base = nil
+                        -- remove chunk data if no entries remain
+                        if next(chunk_data) == nil then
+                            Chunk.set_data(surface, adj_chunk, nil)
+                        end
                     end
                 end
             end
