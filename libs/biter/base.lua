@@ -219,16 +219,13 @@ function BiterBase.create_plan(base)
     LogAI("Current Number of Worms in Base: %d", base, #base.worms)
 
     if base:can_afford('identify_targets') then
-        if not base.target then
+        if not base.targets then
             LogAI("No active targets, chooses AI plan to identify targets", base)
             BiterBase.set_active_plan(base, 'identify_targets')
             return true
         end
 
-        if not base.target.tick then
-            base.target.tick = game.tick
-        end
-        local age = game.tick - base.target.tick
+        local age = game.tick - base.targets.tick
         if math.random(200) < (age / Time.MINUTE) then
             LogAI("Recalculating targets, previous target is %s minutes old", base, serpent.line((age / Time.MINUTE)))
             BiterBase.set_active_plan(base, 'identify_targets')
@@ -256,7 +253,7 @@ function BiterBase.create_plan(base)
         return true
     end
 
-    if base:can_afford('attack_area') and base.target and base.target.type == 'player_value' then
+    if base:can_afford('attack_area') and base.targets then
         local active_chunk = BiterBase.is_in_active_chunk(base)
         if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
 

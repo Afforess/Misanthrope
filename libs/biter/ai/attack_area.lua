@@ -30,7 +30,19 @@ AttackArea.stages.spawning = function(base, data)
 end
 
 AttackArea.stages.plan_attack = function(base, data)
-    local end_pos = Area.center(Chunk.to_area(base.target.chunk_pos))
+    local candidates = base.targets.candidates
+    if #candidates == 0 then
+        base.targets = nil
+        return 'fail'
+    end
+    local idx = math.random(#candidates)
+    local candidate = table.remove(candidates, idx)
+    Log("Attack candidate: %s", base, serpent.line(candidate))
+    if #candidates == 0 then
+        base.targets = nil
+    end
+
+    local end_pos = Area.center(Chunk.to_area(candidate.chunk_pos))
     local command = {type = defines.command.attack_area, destination = end_pos, radius = 16}
     local entities = table.filter(base.entities, Game.VALID_FILTER)
 
@@ -62,6 +74,9 @@ function AttackArea.tick(base, data)
 end
 
 function AttackArea.is_expired(base, data)
+    if data.stage == 'fail' or data.stage == 'success' then
+        return true
+    end
     return data.attack_group and (not data.attack_group.valid or game.tick > data.attack_tick + Time.MINUTE * 6)
 end
 

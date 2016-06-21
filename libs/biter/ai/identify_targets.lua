@@ -5,7 +5,7 @@ local Log = function(str, ...) BiterBase.LogAI("[IdentifyTargets] " .. str, ...)
 
 IdentifyTargets.stages.setup = function(base, data)
     local chunk_pos = Chunk.from_position(base.queen.position)
-    local search_area = Position.expand_to_area(chunk_pos, 15)
+    local search_area = Position.expand_to_area(chunk_pos, 20)
     data.start_chunk = chunk_pos
     data.search_queue = {}
     data.search_idx = 1
@@ -28,8 +28,8 @@ IdentifyTargets.stages.search = function(base, data)
     if chunk_data and chunk_data.player_value and chunk_data.player_value > 0 then
         local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
 
-        value = chunk_data.player_value / ((1 + dist) * (1 + dist))
-        table.insert(data.candidates, { chunk_pos = chunk_pos, data = chunk_data, value = value})
+        value = (chunk_data.player_value * chunk_data.player_value) / ((1 + dist) * (1 + dist))
+        table.insert(data.candidates, { chunk_pos = chunk_pos, value = value})
     end
 
     data.search_idx = data.search_idx + 1
@@ -46,15 +46,16 @@ IdentifyTargets.stages.sort = function(base, data)
     end)
 
     Log("All candidates: %s", base, serpent.block(data.candidates))
+    data.candidates = table.filter(data.candidates, function(candidate)
+        return candidate.value > 100
+    end)
+    if #data.candidates == 0 then
+        Log("No candidates, unable to identify any valuable targets.", base)
+        return 'fail'
+    end
+    Log("Filtered candidates: %s", base, serpent.block(data.candidates))
 
-    return 'decide'
-end
-
-IdentifyTargets.stages.decide = function(base, data)
-    local idx = math.random(#data.candidates)
-    local choosen_candidate = data.candidates[idx]
-    Log("Randomly chosen candidate was %s", base, serpent.line(choosen_candidate))
-    base.target = { type = 'player_value', chunk_pos = choosen_candidate.chunk_pos, tick = game.tick}
+    base.targets = { candidates = data.candidates, tick = game.tick }
     return 'success'
 end
 
