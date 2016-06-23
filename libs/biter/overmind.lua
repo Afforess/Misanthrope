@@ -107,7 +107,7 @@ Overmind.stages.spawn_biters = function(data)
     end
 
     local max_age = game.tick + Time.MINUTE * 10
-    local attack_group_size = math.floor(10 + game.evolution_factor / 0.025)
+    local attack_group_size = math.floor(30 + game.evolution_factor / 0.025)
     local tracked_entities = global.overmind.tracked_entities
     local biters = {}
     local all_units = {'behemoth-biter', 'behemoth-spitter', 'big-biter', 'big-spitter', 'medium-biter', 'medium-spitter', 'small-spitter', 'small-biter'}

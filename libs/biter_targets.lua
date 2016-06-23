@@ -1,17 +1,36 @@
-BITER_TARGETS = {}
-BITER_TARGETS["big-electric-pole"] = { value = 300, danger_modifier = 0.25 }
-BITER_TARGETS["medium-electric-pole"] = { value = 100, danger_modifier = 0.5 }
-BITER_TARGETS["small-electric-pole"] = { value = 60, danger_modifier = 0.75 }
+require 'libs/biter/biter'
 
-BITER_TARGETS["roboport"] = { value = 500, danger_modifier = 1 }
-BITER_TARGETS["roboportmk2"] = { value = 750, danger_modifier = 1 }
+Biters.targets = {}
 
-BITER_TARGETS["pipe-to-ground"] = { value = 50, danger_modifier = 1 }
-BITER_TARGETS["pipe"] = { value = 8, danger_modifier = 1 }
+table.insert(Biters.targets, {name = "big-electric-pole", value = 300, min_evolution = 0.9})
+table.insert(Biters.targets, {name = "medium-electric-pole", value = 100, min_evolution = 0.7})
+table.insert(Biters.targets, {name = "small-electric-pole", value = 60, min_evolution = 0.5})
 
-BITER_TARGETS["express-transport-belt-to-ground"] = { value = 50, danger_modifier = 1 }
-BITER_TARGETS["fast-transport-belt-to-ground"] = { value = 20, danger_modifier = 1 }
-BITER_TARGETS["basic-transport-belt-to-ground"] = { value = 10, danger_modifier = 1 }
+table.insert(Biters.targets, {type = "roboport", value = 500, min_evolution = 0})
+table.insert(Biters.targets, {type = "radar", value = 500, min_evolution = 0})
+table.insert(Biters.targets, {type = "pipe", value = 10, min_evolution = 0})
+table.insert(Biters.targets, {name = "pipe-to-ground", value = 50, min_evolution = 0})
 
-BITER_TARGETS["offshore-pump"] = { value = 150, danger_modifier = 1 }
-BITER_TARGETS["storage-tank"] = { value = 50, danger_modifier = 1 }
+table.insert(Biters.targets, {type = "transport-belt", value = 20, min_evolution = 0})
+table.insert(Biters.targets, {type = "offshore-pump", value = 20, min_evolution = 0})
+table.insert(Biters.targets, {type = "storage-tank", value = 20, min_evolution = 0})
+
+table.insert(Biters.targets, {type = "solar-panel", value = 100, min_evolution = 0.5})
+table.insert(Biters.targets, {type = "boiler", value = 25, min_evolution = 0.3})
+
+function Biters.entity_value(entity)
+    local entity_name = entity.name
+    local entity_type = entity.type
+    local evo_factor = game.evolution_factor
+    for i = 1, #Biters.targets do
+        local target_data = Biters.targets[i]
+        if evo_factor > target_data.min_evolution then
+            if target_data.name == entity_name then
+                return target_data.value
+            elseif target_data.type == entity_type then
+                return target_data.value
+            end
+        end
+    end
+    return -1
+end

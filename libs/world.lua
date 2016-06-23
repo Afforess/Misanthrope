@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 41
+World.version = 42
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -41,13 +41,22 @@ function World.migrate(old_version, new_version)
                 end
             end
         end
-    elseif old_version < 41 then
+    end
+    if old_version < 41 then
         for i = #global.bases, 1, -1 do
             local base = global.bases[i]
             base.target = nil
         end
         if global.overmind then
             global.overmind.currency = 0
+        end
+    end
+    if old_version < 42 then
+        World.recalculate_chunk_values()
+        for i = #global.bases, 1, -1 do
+            local base = global.bases[i]
+            base.targets = nil
+            BiterBase.set_active_plan(base, 'idle')
         end
     end
 end

@@ -31,27 +31,29 @@ function World.entity_value(entity)
     local entity_name = entity.name
     local value = 0
     local adj_value = 0
+    local biter_value = Biters.entity_value(entity)
     if entity.type:contains('turret') then
         value = -1 * game.entity_prototypes[entity_name].max_health
         adj_value = value / 2
-    elseif BITER_TARGETS[entity_name] then
-        value = BITER_TARGETS[entity_name].value
-    elseif entity.type:contains('electric-pole') then
-        value = game.entity_prototypes[entity_name].max_health
-    elseif entity.type:contains('roboport') then
-        value = game.entity_prototypes[entity_name].max_health / 8
-    elseif entity.type:contains('transport-belt') then
-        value = game.entity_prototypes[entity_name].max_health / 2
+    elseif biter_value > 0 then
+        value = biter_value
     elseif entity.type:contains('container') then
         value = game.entity_prototypes[entity_name].max_health / 3
     end
     if value ~= 0 then
         Log("Entity %s value is %d", entity.name, value)
     end
-    return value, adj_value
+    return math.floor(value), math.floor(adj_value)
 end
 
 function World.recalculate_chunk_values()
+    local nauvis = game.surfaces.nauvis
+    for chunk in nauvis.get_chunks() do
+        local chunk_data = Chunk.get_data(nauvis, chunk)
+        if chunk_data then
+            chunk_data.player_value = nil
+        end
+    end
     local all_entities = Surface.find_all_entities({force = game.forces.player})
     Log("Total number of player entities: %d", #all_entities)
     local entity_prototypes = game.entity_prototypes
