@@ -14,7 +14,7 @@ function World.setup()
         -- goodbye fair world
         local old_global = global
         global = {}
-        global.mod_version = World.version
+        global.mod_version = 0
 
         Harpa.migrate(old_global)
         World.recalculate_chunk_values()

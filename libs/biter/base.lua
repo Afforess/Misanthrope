@@ -204,7 +204,7 @@ BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
     identify_targets = { passive = true, cost = 600, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 3000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
-    harrassment = { passive = false, cost = 5000, update_frequency = 173, class = require 'libs/biter/ai/harrassment'},
+    harrassment = { passive = false, cost = 7000, update_frequency = 173, class = require 'libs/biter/ai/harrassment'},
     attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
     alert = { passive = false, cost = 120, update_frequency = 180, class = require 'libs/biter/ai/alert' },
     grow_hive = { passive = true, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/grow_hive' },
@@ -266,7 +266,7 @@ function BiterBase.create_plan(base)
         end
     end
 
-    if base:can_afford('attack_area') and base.targets then
+    if math.random(100) > (game.evolution_factor * 100) and base:can_afford('attack_area') and base.targets then
         local active_chunk = BiterBase.is_in_active_chunk(base)
         if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
 
