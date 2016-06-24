@@ -256,7 +256,9 @@ function BiterBase.create_plan(base)
         end
     end
 
-    if math.random(100) > 75 and base:can_afford('harrassment') and base.targets then
+    local evo_factor = game.evolution_factor * 100
+
+    if evo_factor > 30 and math.random(100) > 80 and base:can_afford('harrassment') and base.targets then
         local active_chunk = BiterBase.is_in_active_chunk(base)
         if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
 
@@ -266,7 +268,7 @@ function BiterBase.create_plan(base)
         end
     end
 
-    if math.random(100) > (game.evolution_factor * 100) and base:can_afford('attack_area') and base.targets then
+    if math.random(100) < evo_factor and base:can_afford('attack_area') and base.targets then
         local active_chunk = BiterBase.is_in_active_chunk(base)
         if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
 
@@ -327,7 +329,7 @@ function BiterBase.create_entity(base, surface, entity_data)
     if not base.entities then base.entities = {} end
     table.insert(base.entities, entity)
 
-    local evo_cost = 0.000001 * game.entity_prototypes[entity_data.name].max_health
+    local evo_cost = 0.00000025 * game.entity_prototypes[entity_data.name].max_health
     game.evolution_factor = game.evolution_factor - evo_cost
 
     return entity
@@ -337,7 +339,7 @@ function BiterBase.destroy_entity(entity)
     if not entity or not entity.valid then
         return
     end
-    local evo_cost = 0.000001 * game.entity_prototypes[entity.name].max_health
+    local evo_cost = 0.00000025 * game.entity_prototypes[entity.name].max_health
     game.evolution_factor = game.evolution_factor + evo_cost
     entity.destroy()
 end
