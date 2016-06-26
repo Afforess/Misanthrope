@@ -14,7 +14,7 @@ Event.register(defines.events.on_entity_died, function(event)
     for x, y in Area.iterate(area) do
         local pos = {x = x, y = y}
         local dist_squared = Position.distance_squared(position, pos)
-        local delta = math.floor(max_health / math.pow(dist_squared, 0.25))
+        local delta = math.min(max_health, math.floor(max_health / math.pow(dist_squared, 0.25)))
         if delta > 1 then
             local data = Tile.get_data(surface, pos, {})
             if not data.scent then
