@@ -88,7 +88,10 @@ Overmind.stages.spawn_biters = function(data)
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
     local surface = global.overwatch.surface
-
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 0 then
+        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+        return 'decide'
+    end
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
         Log("Chunk %s had biter spawners within 2 chunks", serpent.line(chunk))
         return 'decide'
@@ -149,11 +152,7 @@ Overmind.stages.spread_spawner = function(data)
 
     local surface = global.overwatch.surface
     local area = Chunk.to_area(chunk)
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
-        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
-        return 'decide'
-    end
-    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
+    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
         Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
         return 'decide'
     end

@@ -142,7 +142,9 @@ Overwatch.stages.analyze_base = function(data)
             local chunk_data = Chunk.get_data(surface, adj_chunk)
             if chunk_data then
                 if chunk_data.player_value then
-                    data.value = data.value + chunk_data.player_value
+
+                    -- don't track negative value chunks
+                    data.value = data.value + math.max(0, chunk_data.player_value)
 
                     if chunk_data.player_value > data.best.value then
                         data.best.value = chunk_data.player_value
