@@ -146,8 +146,8 @@ end
 
 function BiterBase.on_queen_death(base)
     Log("Biter Base queen died at %s", BiterBase.tostring(base))
-    local hives = #table.filter(base.hives, Game.VALID_FILTER)
-    if hives == 0 then
+    base.hives = table.filter(base.hives, Game.VALID_FILTER)
+    if #base.hives == 0 then
         Log("%s has no remaining hives, and no queen. ", BiterBase.tostring(base))
         base.valid = false
         global.bases = table.filter(global.bases, Game.VALID_FILTER)
@@ -203,8 +203,9 @@ function BiterBase.is_in_active_chunk(base)
             closest_dist = dist_squared
         end
     end
-    -- if players are > 500 away, never active
-    if closest_dist > 250000 then
+    LogAI("Closest dist: %d", base, closest_dist)
+    -- if players are > 1000 away, never active
+    if closest_dist > 1000000 then
         return false
     end
     return surface.get_pollution(pos) > 5
