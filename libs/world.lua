@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 42
+World.version = 43
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -57,6 +57,11 @@ function World.migrate(old_version, new_version)
             local base = global.bases[i]
             base.targets = nil
             BiterBase.set_active_plan(base, 'idle')
+        end
+    end
+    if old_version < 43 then
+        if global.overmind then
+            global.overmind = nil
         end
     end
 end

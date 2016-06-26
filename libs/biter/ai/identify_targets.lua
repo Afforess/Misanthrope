@@ -39,6 +39,7 @@ end
 IdentifyTargets.stages.sort = function(base, data)
     if #data.candidates == 0 then
         Log("No candidates, unable to identify any targets.", base)
+        base.targets = { candidates = {}, tick = game.tick }
         return 'fail'
     end
     table.sort(data.candidates, function(a, b)
@@ -51,6 +52,7 @@ IdentifyTargets.stages.sort = function(base, data)
     end)
     if #data.candidates == 0 then
         Log("No candidates, unable to identify any valuable targets.", base)
+        base.targets = { candidates = {}, tick = game.tick }
         return 'fail'
     end
     Log("Filtered candidates: %s", base, serpent.block(data.candidates))

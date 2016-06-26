@@ -12,7 +12,7 @@ local Log = function(str, ...) Overmind.Logger.log(string.format(str, ...)) end
 
 Event.register(defines.events.on_tick, function(event)
     if not global.overmind then
-        global.overmind = { tick_rate = 600, currency = 0, stage = 'setup', data = {}, chunks = {}, valuable_chunks = {}, surface = game.surfaces.nauvis, tracked_entities = {} }
+        global.overmind = { tick_rate = 600, currency = 0, stage = 'decide', data = {}, tracked_entities = {} }
     end
     if not (event.tick % global.overmind.tick_rate == 0) then return end
 
@@ -20,6 +20,8 @@ Event.register(defines.events.on_tick, function(event)
     if event.tick % 600 == 0 then
         if not global.bases or #global.bases < 3 then
             global.overmind.currency = global.overmind.currency + 100
+        elseif #global.bases < 50 then
+            global.overmind.currency = global.overmind.currency + 10 + (50 - #global.bases)
         else
             global.overmind.currency = global.overmind.currency + 10
         end
@@ -48,39 +50,29 @@ Event.register(defines.events.on_tick, function(event)
     end
 end)
 
-Overmind.tick_rates.setup = Time.SECOND * 10
-Overmind.stages.setup = function(data)
-    local chunks = global.overmind.chunks
-    for chunk in game.surfaces.nauvis.get_chunks() do
-        table.insert(chunks, chunk)
-    end
-    Log("Found %d chunks to scan", #chunks)
-    return 'scan_chunk'
-end
-
-Overmind.tick_rates.decide = Time.SECOND * 10
+Overmind.tick_rates.decide = Time.SECOND * 20
 Overmind.stages.decide = function(data)
-    if #global.overmind.valuable_chunks > 0 then
-        Log("Overmind currency: %d", math.floor(global.overmind.currency))
-        if global.overmind.currency > 10000 and math.random(100) > 50 then
-            global.overmind.currency = global.overmind.currency - 10000
-            return 'spread_spawner'
-        end
+    Log("Overmind currency: %d, Valuable Chunks: %d", math.floor(global.overmind.currency), #global.overwatch.valuable_chunks)
+    if #global.overwatch.valuable_chunks > 0 then
+        if global.overmind.currency > 10000 then
+            if math.random(100) > 90 then
+                global.overmind.currency = global.overmind.currency - 3000
+                return 'spawn_biters'
+            end
 
-        if global.overmind.currency > 3000 and math.random(100) > 90 then
-            global.overmind.currency = global.overmind.currency - 3000
-            return 'spawn_biters'
+            if math.random(100) > 50 then
+                global.overmind.currency = global.overmind.currency - 10000
+                return 'spread_spawner'
+            end
         end
-
-        return 'decide'
     end
-    return 'setup'
+    return 'decide'
 end
 
 Overmind.tick_rates.spawn_biters = Time.MINUTE / 4
 Overmind.stages.spawn_biters = function(data)
-    Log("Attempting to spawn biters, total valuable chunks: %d", #global.overmind.valuable_chunks)
-    local spawnable_chunks = table.filter(global.overmind.valuable_chunks, function(data) return data.best_target ~= nil end)
+    Log("Attempting to spawn biters, total valuable chunks: %d", #global.overwatch.valuable_chunks)
+    local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.best_target ~= nil end)
     table.sort(spawnable_chunks, function(a, b)
         return b.value < a.value
     end)
@@ -90,19 +82,15 @@ Overmind.stages.spawn_biters = function(data)
 
     local chunk_data = spawnable_chunks[1]
     local chunk = chunk_data.chunk
-    global.overmind.valuable_chunks = table.filter(global.overmind.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
-    Log("Choose chunk %s to spawn units on, remaining valuable chunks: %d", serpent.line(chunk), #global.overmind.valuable_chunks)
+    global.overwatch.valuable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
+    Log("Choose chunk %s to spawn units on, remaining valuable chunks: %d", serpent.line(chunk), #global.overwatch.valuable_chunks)
 
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
-    local surface = global.overmind.surface
+    local surface = global.overwatch.surface
 
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
-        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
-        return 'decide'
-    end
-    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
-        Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
+    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
+        Log("Chunk %s had biter spawners within 2 chunks", serpent.line(chunk))
         return 'decide'
     end
 
@@ -145,8 +133,8 @@ end
 
 Overmind.tick_rates.spread_spawner = Time.MINUTE
 Overmind.stages.spread_spawner = function(data)
-    Log("Attempting to spread a spawner, total valuable chunks: %d", #global.overmind.valuable_chunks)
-    local spawnable_chunks = table.filter(global.overmind.valuable_chunks, function(data) return data.spawn end)
+    Log("Attempting to spread a spawner, total valuable chunks: %d", #global.overwatch.valuable_chunks)
+    local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.spawn end)
     table.sort(spawnable_chunks, function(a, b)
         return b.value < a.value
     end)
@@ -156,10 +144,10 @@ Overmind.stages.spread_spawner = function(data)
 
     local chunk_data = spawnable_chunks[1]
     local chunk = chunk_data.chunk
-    global.overmind.valuable_chunks = table.filter(global.overmind.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
-    Log("Choose chunk %s to spawn a new base, remaining valuable chunks: %d", serpent.line(chunk), #global.overmind.valuable_chunks)
+    global.overwatch.valuable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
+    Log("Choose chunk %s to spawn a new base, remaining valuable chunks: %d", serpent.line(chunk), #global.overwatch.valuable_chunks)
 
-    local surface = global.overmind.surface
+    local surface = global.overwatch.surface
     local area = Chunk.to_area(chunk)
     if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
         Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
@@ -181,111 +169,4 @@ Overmind.stages.spread_spawner = function(data)
     end
 
     return 'decide'
-end
-
-Overmind.tick_rates.scan_chunk = 6
-Overmind.stages.scan_chunk = function(data)
-    if #global.overmind.chunks == 0 then
-        return 'decide'
-    end
-    if #global.overmind.chunks % 100 == 0 then
-        Log("Currently %d chunks in queue to be scanned", #global.overmind.chunks)
-    end
-    local chunk = table.remove(global.overmind.chunks, 1)
-    local surface = global.overmind.surface
-
-    local area = Chunk.to_area(chunk)
-    local chunk_center = Area.center(area)
-
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player}) > 0 then
-        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
-        return 'scan_chunk'
-    end
-    if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 32 * 4), force = game.forces.enemy}) > 0 then
-        Log("Chunk %s had biter spawners within 4 chunks", serpent.line(chunk))
-        return 'scan_chunk'
-    end
-
-    local pos = surface.find_non_colliding_position('biter-spawner', chunk_center, 16, 1)
-    if not pos or not Area.inside(area, pos) then
-        local pos = surface.find_non_colliding_position('medium-biter', chunk_center, 16, 1)
-        if not pos or not Area.inside(area, pos) then
-            Log("Chunk %s had no suitable location for spawner or biter", serpent.line(chunk))
-            return 'scan_chunk'
-        else
-            Log("Chunk %s had no suitable location for spawner, but may support spawning biters", serpent.line(chunk))
-            data.chunk = chunk
-            data.adjacent = {}
-            data.spawn = false
-            data.nearby_bases = 0
-            data.value = 0
-            data.best = { value = 0, chunk = nil }
-            for x, y in Area.iterate(Position.expand_to_area(chunk, 7)) do
-                table.insert(data.adjacent, {x = x, y = y})
-            end
-            return 'evaluate_base'
-        end
-    end
-    Log("Chunk %s had a suitable location for spawner", serpent.line(chunk))
-    data.chunk = chunk
-    data.adjacent = {}
-    data.spawn = true
-    data.nearby_bases = 0
-    data.value = 0
-    data.best = { value = 0, chunk = nil }
-    for x, y in Area.iterate(Position.expand_to_area(chunk, 13)) do
-        table.insert(data.adjacent, {x = x, y = y})
-    end
-
-    return 'evaluate_base'
-end
-
-Overmind.tick_rates.evaluate_base = 1
-Overmind.stages.evaluate_base = function(data)
-    if #data.adjacent == 0 then
-        local value = math.floor(data.value)
-        local nearby_bases = data.nearby_bases
-        value = (value * 6) / (1 + nearby_bases)
-        if value > 1000 then
-            Log("Finished evaluating chunk %s, its value is %d", serpent.line(data.chunk), value)
-            table.insert(global.overmind.valuable_chunks, { chunk = data.chunk, value = value, spawn = data.spawn, best_target = data.best })
-        else
-            --Log("Finished evaluating chunk %s, its value was too low (%d)", serpent.line(data.chunk), value)
-        end
-        data.reset = true
-        return 'scan_chunk'
-    end
-
-    local surface = global.overmind.surface
-    local adjacent_chunks = data.adjacent
-    local limit = math.max(1, #adjacent_chunks - 50)
-    for i = #adjacent_chunks, limit, -1 do
-        local adj_chunk = adjacent_chunks[i]
-        adjacent_chunks[i] = nil
-        if adj_chunk then
-            local chunk_data = Chunk.get_data(surface, adj_chunk)
-            if chunk_data then
-                if chunk_data.player_value then
-                    data.value = data.value + chunk_data.player_value
-
-                    if chunk_data.player_value > data.best.value then
-                        data.best.value = chunk_data.player_value
-                        data.best.chunk = adj_chunk
-                    end
-                end
-                if chunk_data.base then
-                    if chunk_data.base.valid then
-                        data.nearby_bases = data.nearby_bases + 1
-                    else
-                        chunk_data.base = nil
-                        -- remove chunk data if no entries remain
-                        if next(chunk_data) == nil then
-                            Chunk.set_data(surface, adj_chunk, nil)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return 'evaluate_base'
 end

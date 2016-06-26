@@ -7,6 +7,7 @@ require 'stdlib/table'
 require 'stdlib/game'
 require 'libs/biter/random_name'
 require 'libs/biter/biter'
+require 'libs/biter/overwatch'
 require 'libs/biter/overmind'
 
 BiterBase = {}
@@ -192,17 +193,26 @@ end
 function BiterBase.is_in_active_chunk(base)
     local surface = base.queen.surface
     local pos = base.queen.position
+    local closest_dist = -1
     for _, character in pairs(World.all_characters(surface)) do
-        if Position.distance_squared(pos, character.position) < 25600 then
+        local dist_squared = Position.distance_squared(pos, character.position)
+        if dist_squared < 25600 then
             return true
         end
+        if closest_dist == -1 or dist_squared < closest_dist then
+            closest_dist = dist_squared
+        end
+    end
+    -- if players are > 500 away, never active
+    if closest_dist > 250000 then
+        return false
     end
     return surface.get_pollution(pos) > 5
 end
 
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
-    identify_targets = { passive = true, cost = 600, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
+    identify_targets = { passive = true, cost = 500, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 3000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
     harrassment = { passive = false, cost = 7000, update_frequency = 173, class = require 'libs/biter/ai/harrassment'},
     attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
@@ -227,7 +237,7 @@ function BiterBase.create_plan(base)
         end
 
         local age = game.tick - base.targets.tick
-        if math.random(200) < (age / Time.MINUTE) then
+        if math.random(1000) < (age / Time.MINUTE) then
             LogAI("Recalculating targets, previous target is %s minutes old", base, serpent.line((age / Time.MINUTE)))
             BiterBase.set_active_plan(base, 'identify_targets')
             return true
@@ -235,6 +245,14 @@ function BiterBase.create_plan(base)
     end
 
     if math.random(100) < 5 and base:can_afford('donate_currency') then
+        LogAI("Choosing to donate currency to the overmind AI", base)
+        BiterBase.set_active_plan(base, 'donate_currency')
+        return true
+    end
+
+    local active_chunk = BiterBase.is_in_active_chunk(base)
+    if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
+    if not active_chunk and math.random(100) > 50 and base:can_afford('donate_currency') then
         LogAI("Choosing to donate currency to the overmind AI", base)
         BiterBase.set_active_plan(base, 'donate_currency')
         return true
@@ -259,9 +277,6 @@ function BiterBase.create_plan(base)
     local evo_factor = game.evolution_factor * 100
 
     if evo_factor > 30 and math.random(100) > 80 and base:can_afford('harrassment') and base.targets then
-        local active_chunk = BiterBase.is_in_active_chunk(base)
-        if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
-
         if active_chunk then
             BiterBase.set_active_plan(base, 'harrassment')
             return true
@@ -269,9 +284,6 @@ function BiterBase.create_plan(base)
     end
 
     if math.random(100) < evo_factor and base:can_afford('attack_area') and base.targets then
-        local active_chunk = BiterBase.is_in_active_chunk(base)
-        if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
-
         if active_chunk then
             BiterBase.set_active_plan(base, 'attack_area')
             return true
