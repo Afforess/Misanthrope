@@ -50,7 +50,7 @@ Event.register(defines.events.on_tick, function(event)
     end
 end)
 
-Overmind.tick_rates.decide = Time.SECOND * 20
+Overmind.tick_rates.decide = Time.MINUTE * 2
 Overmind.stages.decide = function(data)
     Log("Overmind currency: %d, Valuable Chunks: %d", math.floor(global.overmind.currency), #global.overwatch.valuable_chunks)
     if #global.overwatch.valuable_chunks > 0 then
@@ -69,7 +69,7 @@ Overmind.stages.decide = function(data)
     return 'decide'
 end
 
-Overmind.tick_rates.spawn_biters = Time.MINUTE / 4
+Overmind.tick_rates.spawn_biters = Time.MINUTE * 2
 Overmind.stages.spawn_biters = function(data)
     Log("Attempting to spawn biters, total valuable chunks: %d", #global.overwatch.valuable_chunks)
     local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.best_target ~= nil end)
@@ -134,7 +134,7 @@ Overmind.stages.spawn_biters = function(data)
     return 'decide'
 end
 
-Overmind.tick_rates.spread_spawner = Time.MINUTE
+Overmind.tick_rates.spread_spawner = Time.MINUTE * 4
 Overmind.stages.spread_spawner = function(data)
     Log("Attempting to spread a spawner, total valuable chunks: %d", #global.overwatch.valuable_chunks)
     local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.spawn end)
