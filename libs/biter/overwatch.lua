@@ -109,13 +109,13 @@ Overwatch.stages.evaluate_base = function(data)
 
     local surface = global.overwatch.surface
     local area = Chunk.to_area(data.chunk)
-    local player_entities = surface.count_entities_filtered({area = Area.expand(area, 32 * 4.5), force = game.forces.player})
+    local player_entities = surface.count_entities_filtered({area = Area.expand(area, 32 * 5), force = game.forces.player})
     if player_entities > 0 then
         value = value / (math.sqrt(player_entities))
     end
 
     value = math.floor(value)
-    if value > 100 then
+    if value > 1000 then
         Log("Finished evaluating chunk %s, its value is %d", serpent.line(data.chunk), value)
         table.insert(global.overwatch.valuable_chunks, { chunk = data.chunk, value = value, spawn = data.spawn, best_target = data.best })
     else
