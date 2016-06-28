@@ -5,7 +5,7 @@
   "author": "Afforess",
   "contact": "afforess@gmail.com",
   "homepage": "https://github.com/Afforess/Misanthrope",
-  "description": "Alters biter expansion mechanics, adds vastly improved biter AI behavior",
+  "description": "Vastly improved biter AI behavior, tweaks biter expansion mechanics. Memento mori.",
   "factorio_version": "0.13",
-  "dependencies": ["base >= 0.12.20", "? EvoGUI"]
+  "dependencies": ["? EvoGUI"]
 }
