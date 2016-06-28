@@ -277,7 +277,7 @@ function BiterBase.create_plan(base)
 
     local evo_factor = game.evolution_factor * 100
 
-    if evo_factor > 30 and math.random(100) > 90 and base:can_afford('harrassment') and base.targets then
+    if evo_factor > 30 and math.random(100) > 95 and base:can_afford('harrassment') and base.targets then
         if active_chunk then
             BiterBase.set_active_plan(base, 'harrassment')
             return true

@@ -1,4 +1,3 @@
-require 'defines'
 require 'stdlib/event/event'
 
 EvoGUI = {}
@@ -100,8 +99,10 @@ Event.register(defines.events.on_tick, function(event)
     end
 
     if global.evo_gui.detected and event.tick % 10 == 0 then
-        EvoGUI.update_gui()
-        global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+        if remote.interfaces.EvoGUI then
+            EvoGUI.update_gui()
+            global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
+        end
     end
 end)
 

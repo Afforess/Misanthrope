@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 43
+World.version = 50
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 

@@ -1,4 +1,4 @@
-DEBUG_MODE = true
+DEBUG_MODE = false
 UNIT_GROUP_EVENT_ID = script.generate_event_name()
 local wrapper = function(wrap)
     return function(msg, options)
@@ -18,7 +18,6 @@ _ENV.serpent.line = wrapper(serpent.line)
 _ENV.serpent.block = wrapper(serpent.block)
 _ENV.serpent.dump = wrapper(serpent.dump)
 
-require 'defines'
 require 'stdlib/log/logger'
 require 'stdlib/time'
 require 'remote'
