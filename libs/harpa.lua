@@ -235,7 +235,7 @@ end
 
 function Harpa.get_player_armor(player)
     local status, inventory = pcall(player.get_inventory, defines.inventory.player_armor)
-    if status then
+    if status and inventory then
         return inventory[1]
     end
     return nil

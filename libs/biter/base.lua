@@ -129,8 +129,8 @@ function BiterBase.discover(entity)
             reclaimed_evo = reclaimed_evo + 0.003
         end
     end
-    Log("Destroyed {%d} hives near %s", math.floor(reclaimed_evo / 0.003), BiterBase.tostring(base))
-    game.evolution_factor = math.min(1, game.evolution_factor + reclaimed_evo)
+    --Log("Destroyed {%d} hives near %s", math.floor(reclaimed_evo / 0.003), BiterBase.tostring(base))
+    --game.evolution_factor = math.min(1, game.evolution_factor + reclaimed_evo)
 
     return base
 end
@@ -169,7 +169,11 @@ Event.register(defines.events.on_tick, function(event)
             local chunk_data = Chunk.get_data(character.surface, {x = chunk_x, y = chunk_y})
             if chunk_data and chunk_data.base then
                 local base = chunk_data.base
-                if base.plan.name ~= 'alert' and base.plan.name ~= 'attacked_recently' then
+                local plan_name = 'idle'
+                if base.plan then
+                    plan_name = base.plan.name
+                end
+                if plan_name ~= 'alert' and plan_name ~= 'attacked_recently' then
                     BiterBase.set_active_plan(base, 'alert', { alerted_at = game.tick })
                 end
             end
