@@ -25,6 +25,12 @@ Event.register(defines.events.on_tick, function(event)
         else
             global.overmind.currency = global.overmind.currency + 10
         end
+
+        if game.evolution_factor < 0.1 then
+            global.overmind.currency = math.floor(global.overmind.currency / 5)
+        elseif game.evolution_factor < 0.2 then
+            global.overmind.currency = math.floor(global.overmind.currency / 2)
+        end
     end
 
     -- clear out any tracked entities that have expired their max_age
@@ -36,6 +42,7 @@ Event.register(defines.events.on_tick, function(event)
         end)
         global.overmind.tracked_entities = table.filter(global.overmind.tracked_entities, function(entity_data) return entity_data.entity.valid end)
     end
+
 
     local prev_stage = global.overmind.stage
     local data = global.overmind.data
