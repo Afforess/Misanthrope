@@ -3,26 +3,41 @@ require 'libs/pathfinding_engine'
 local IdentifyTargets = {stages = {}}
 local Log = function(str, ...) BiterBase.LogAI("[IdentifyTargets] " .. str, ...) end
 
+IdentifyTargets.search_radius = 20
+IdentifyTargets.max_search_queue_size = (IdentifyTargets.search_radius + 1) * (IdentifyTargets.search_radius + 1)
+IdentifyTargets.cache = {}
+
+function IdentifyTargets.get_search_queue(data)
+    local search_area = Position.expand_to_area(data.chunk_pos, IdentifyTargets.search_radius)
+    for _, value in pairs(IdentifyTargets.cache) do
+        if value.pos.x == data.chunk_pos.x and value.pos.y == data.chunk_pos.y then
+            return value.search_queue
+        end
+    end
+    local search_queue = {}
+    for x, y in Area.spiral_iterate(search_area) do
+        table.insert(search_queue, {x = x, y = y})
+    end
+    table.insert(IdentifyTargets.cache, {pos = data.chunk_pos, search_queue = search_queue})
+    return search_queue
+end
+
 IdentifyTargets.stages.setup = function(base, data)
     local chunk_pos = Chunk.from_position(base.queen.position)
-    local search_area = Position.expand_to_area(chunk_pos, 20)
+    data.chunk_pos = chunk_pos
     data.start_chunk = chunk_pos
-    data.search_queue = {}
     data.search_idx = 1
     data.candidates = {}
     data.path_finding = { idx = 1, path_id = -1}
     data.completed = false
-    for x, y in Area.spiral_iterate(search_area) do
-        table.insert(data.search_queue, {x = x, y = y})
-    end
     return 'search'
 end
 
 IdentifyTargets.stages.search = function(base, data)
-    if data.search_idx > #data.search_queue then
+    if data.search_idx > IdentifyTargets.max_search_queue_size then
         return 'sort'
     end
-    local chunk_pos = data.search_queue[data.search_idx]
+    local chunk_pos = IdentifyTargets.get_search_queue(data)[data.search_idx]
 
     local chunk_data = Chunk.get_data(base.queen.surface, chunk_pos)
     if chunk_data and chunk_data.player_value and chunk_data.player_value > 0 then

@@ -43,13 +43,11 @@ for key, prototype_type in pairs(data.raw) do
         if prototype.energy_source then
             if prototype.energy_source.emissions and prototype.energy_source.emissions > 0.001 then
                 if name:contains('assembling-machine') and not name == 'assembling-machine-1' then
-                    prototype.energy_source.emissions = prototype.energy_source.emissions * 8
+                    prototype.energy_source.emissions = prototype.energy_source.emissions * 10
                 else
-                    prototype.energy_source.emissions = prototype.energy_source.emissions * 5
+                    prototype.energy_source.emissions = prototype.energy_source.emissions * 7
                 end
             end
-        elseif key == 'inserter' then
-            prototype.energy_source.emissions = 0.002
         end
     end
 end

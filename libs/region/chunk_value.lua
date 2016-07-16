@@ -46,12 +46,14 @@ function World.entity_value(entity)
     return math.floor(value), math.floor(adj_value)
 end
 
-function World.recalculate_chunk_values()
-    local nauvis = game.surfaces.nauvis
-    for chunk in nauvis.get_chunks() do
-        local chunk_data = Chunk.get_data(nauvis, chunk)
-        if chunk_data then
-            chunk_data.player_value = nil
+function World.recalculate_chunk_values(reset)
+    if reset then
+        local nauvis = game.surfaces.nauvis
+        for chunk in nauvis.get_chunks() do
+            local chunk_data = Chunk.get_data(nauvis, chunk)
+            if chunk_data then
+                chunk_data.player_value = nil
+            end
         end
     end
     local all_entities = Surface.find_all_entities({force = game.forces.player})

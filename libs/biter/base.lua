@@ -56,7 +56,14 @@ function Base.all_hives(self)
 end
 
 function Base.wanted_hive_count(self)
-    return math.max(0, 1 + (game.evolution_factor / 0.1) - #self:all_hives())
+    local evo_factor = game.evolution_factor
+    local evo_factor_hives = (evo_factor / 0.1)
+    if evo_factor > 0.5 then
+        evo_factor_hives = math.floor(evo_factor_hives * 3 / 2)
+    end
+    local pollution = self.queen.surface.get_pollution(self.queen.position)
+    local pollution_hives = math.floor(math.min(5, pollution / 1000))
+    return math.max(0, 1 + evo_factor_hives + pollution_hives - #self:all_hives())
 end
 
 function Base.wanted_worm_count(self)
@@ -65,11 +72,31 @@ function Base.wanted_worm_count(self)
         alert_count = alert_count + self.history['alert']
     end
 
-    return math.max(0, 1 + alert_count - #self.worms)
+    return math.max(0, 1 + (alert_count * 2) - #self.worms)
 end
 
 function Base.can_afford(self, plan)
-    return self.currency >= BiterBase.plans[plan].cost
+    return self.currency.amt >= BiterBase.plans[plan].cost
+end
+
+function Base.get_currency(self, include_savings)
+    if include_savings then
+        return self.currency.amt + self.currency.savings
+    end
+    return self.currency.amt
+end
+
+function Base.spend_currency(self, amt)
+    local wallet = self.currency
+    local new_amt = wallet.amt - amt
+    if new_amt < 0 then
+        wallet.amt = 0
+        wallet.savings = wallet.savings + new_amt
+    else
+        wallet.amt = new_amt
+    end
+    LogAI("Spend %d currency, new amt: %d, savings amt: %d", self, amt, wallet.amt, wallet.savings)
+    return wallet.amt
 end
 
 -- Biter Base metatable
@@ -92,7 +119,7 @@ function BiterBase.discover(entity)
     local surface = entity.surface
 
     -- initialize biter base data structure
-    local base = { queen = entity, hives = {}, worms = {}, currency = 0, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}, valid = true}
+    local base = { queen = entity, hives = {}, worms = {}, currency = {amt = 0, savings = 0}, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}, valid = true}
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
     local chunk_data = Chunk.get_data(surface, Chunk.from_position(pos), {})
@@ -100,7 +127,7 @@ function BiterBase.discover(entity)
     Log("Created new biter base {%s} at (%d, %d)", base.name, pos.x, pos.y)
 
     -- scan for nearby unclaimed hives
-    local nearby_area = Position.expand_to_area(pos, 10)
+    local nearby_area = Position.expand_to_area(pos, 12)
     local spawners = surface.find_entities_filtered({ area = nearby_area, type = 'unit-spawner', force = entity.force})
     for _, spawner in pairs(spawners) do
         if spawner ~= entity then
@@ -112,25 +139,37 @@ function BiterBase.discover(entity)
     Log("Discovered {%d} hives near %s", #base.hives, BiterBase.tostring(base))
 
     -- scan for nearby unclaimed worms
-    local worms = surface.find_entities_filtered({ area = nearby_area, type = 'turret', force = entity.force})
+    local worms = surface.find_entities_filtered({ area = Position.expand_to_area(pos, 48), type = 'turret', force = entity.force})
     for _, worm in pairs(worms) do
         -- associate each of these entities with the base
-        Entity.set_data(worm, {base = base})
-        table.insert(base.worms, worm)
+        if not Entity.get_data(worm) then
+            Entity.set_data(worm, {base = base})
+            table.insert(base.worms, worm)
+        end
     end
     Log("Discovered {%d} worms near %s", #base.worms, BiterBase.tostring(base))
 
+    local reclaimed_currency = 0
+    if #base.worms > 0 then
+        local old_worms = #base.worms
+        table.each(table.filter(base.worms, function(worm) return Position.manhattan_distance(worm.position, pos) >= 8 end), function(worm)
+            Entity.set_data(worm, nil)
+            worm.destroy()
+            reclaimed_currency = reclaimed_currency + 200
+        end)
+        base.worms = table.filter(base.worms, Game.VALID_FILTER)
+        Log("Removed {%d} far away worms near %s", old_worms - #base.worms, BiterBase.tostring(base))
+    end
+
     -- destroy hives too close, but too far to be useful
-    local reclaimed_evo = 0
     spawners = surface.find_entities_filtered({ area = Position.expand_to_area(pos, 32), type = 'unit-spawner', force = entity.force})
     for _, spawner in pairs(spawners) do
         if not Area.inside(nearby_area, spawner.position) then
             spawner.destroy()
-            reclaimed_evo = reclaimed_evo + 0.003
+            reclaimed_currency = reclaimed_currency + 1000
         end
     end
-    --Log("Destroyed {%d} hives near %s", math.floor(reclaimed_evo / 0.003), BiterBase.tostring(base))
-    --game.evolution_factor = math.min(1, game.evolution_factor + reclaimed_evo)
+    base.currency.amt = reclaimed_currency
 
     return base
 end
@@ -225,12 +264,14 @@ BiterBase.plans = {
     grow_hive = { passive = true, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/grow_hive' },
     build_worm = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/build_worm' },
     donate_currency = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/donate_currency' },
+    save_currency = { passive = true, cost = 0, update_frequency = 600, class = require 'libs/biter/ai/save_currency' },
+    assist_ally = { passive = false, cost = 2000, update_frequency = 200, class = require 'libs/biter/ai/assist_ally' },
 }
 
 function BiterBase.create_plan(base)
     LogAI("", base)
     LogAI("--------------------------------------------------", base)
-    LogAI("Choosing new plan, currency: %s", base, serpent.line(base.currency))
+    LogAI("Choosing new plan, wallet: %s", base, serpent.line(base.currency))
     LogAI("Current Number of Hives in Base: %d", base, #base:all_hives())
     LogAI("Current Number of Worms in Base: %d", base, #base.worms)
 
@@ -249,6 +290,12 @@ function BiterBase.create_plan(base)
         end
     end
 
+    if math.random(100) < 33 and math.random(10000) > base.currency.savings then
+        LogAI("Choosing to save currency for a rainy day", base)
+        BiterBase.set_active_plan(base, 'save_currency')
+        return true
+    end
+
     if math.random(100) < 5 and base:can_afford('donate_currency') then
         LogAI("Choosing to donate currency to the overmind AI", base)
         BiterBase.set_active_plan(base, 'donate_currency')
@@ -257,7 +304,7 @@ function BiterBase.create_plan(base)
 
     local active_chunk = BiterBase.is_in_active_chunk(base)
     if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
-    if not active_chunk and math.random(100) > 50 and base:can_afford('donate_currency') then
+    if not active_chunk and math.random(100) > 20 and base:can_afford('donate_currency') then
         LogAI("Choosing to donate currency to the overmind AI", base)
         BiterBase.set_active_plan(base, 'donate_currency')
         return true
@@ -281,7 +328,7 @@ function BiterBase.create_plan(base)
 
     local evo_factor = game.evolution_factor * 100
 
-    if evo_factor > 30 and math.random(100) > 95 and base:can_afford('harrassment') and base.targets then
+    if evo_factor > 30 and math.random(100) < 5 and base:can_afford('harrassment') and base.targets then
         if active_chunk then
             BiterBase.set_active_plan(base, 'harrassment')
             return true
@@ -326,8 +373,11 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
         LogAI("Switching AI plan to {%s}", base, plan_name)
     end
 
+    if not getmetatable(base) then
+        setmetatable(base, BaseMt)
+    end
     base.plan = { name = plan_name, data = data, valid = true}
-    base.currency = base.currency - plan_data.cost
+    base:spend_currency(plan_data.cost)
     base.next_tick = game.tick + plan_data.update_frequency
     if base.history[plan_name] then
         base.history[plan_name] = base.history[plan_name] + 1
@@ -346,9 +396,10 @@ function BiterBase.create_entity(base, surface, entity_data)
     if not base.entities then base.entities = {} end
     table.insert(base.entities, entity)
 
-    local evo_cost = 0.00000025 * game.entity_prototypes[entity_data.name].max_health
-    game.evolution_factor = game.evolution_factor - evo_cost
-
+    if base.plan and not (base.plan.name == 'attacked_recently' or base.plan.name == 'assist_ally') then
+        local evo_cost = 0.00000025 * game.entity_prototypes[entity_data.name].max_health
+        game.evolution_factor = game.evolution_factor - evo_cost
+    end
     return entity
 end
 
@@ -393,9 +444,32 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
         local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
         Log("Trigger entity created, chunk_data: %s", serpent.block(data, {comment = false}))
         if data and data.base then
-            data.base.last_attacked = event.tick
-            if data.base.plan.name ~= 'attacked_recently' then
-                BiterBase.set_active_plan(data.base, 'attacked_recently')
+            local base = data.base
+            base.last_attacked = event.tick
+            if base.plan.name ~= 'attacked_recently' then
+                BiterBase.set_active_plan(base, 'attacked_recently')
+
+                -- if we can afford it, recruit allies!
+                base.currency.savings = 10000
+                LogAI("Under Attack!", base)
+                LogAI("Currency: %s", base, serpent.line(base.currency))
+
+                if base:get_currency(true) > BiterBase.plans.assist_ally.cost then
+                    local cost = BiterBase.plans.assist_ally.cost
+                    local pos = base.queen.position
+                    local hives = table.filter(global.bases, function(ally_base)
+                        if ally_base ~= base and ally_base.valid and ally_base.queen.valid and Position.distance_squared(pos, ally_base.queen.position) < 50000 then
+                            return ally_base.plan.name ~='attacked_recently'
+                        end
+                    end)
+                    table.each(hives, function(ally_base)
+                        if base:get_currency(true) > cost then
+                            ally_base.currency.amt = ally_base.currency.amt + cost
+                            base:spend_currency(cost)
+                            BiterBase.set_active_plan(ally_base, 'assist_ally', {ally_base = base})
+                        end
+                    end)
+                end
             end
         end
         event.entity.destroy()
@@ -410,7 +484,7 @@ Event.register(defines.events.on_tick, function(event)
             if not base.queen.valid then
                 BiterBase.on_queen_death(base)
             else
-                base.currency = base.currency + 1 + #base.hives
+                base.currency.amt = base.currency.amt + 1 + #base.hives
                 if base.next_tick < tick then
                     if not getmetatable(base) then
                         setmetatable(base, BaseMt)

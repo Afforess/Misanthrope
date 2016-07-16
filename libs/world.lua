@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 50
+World.version = 60
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -29,8 +29,14 @@ end
 
 function World.migrate(old_version, new_version)
     Log("Migrating world data from {%s} to {%s}...", old_version, new_version)
-    if old_version < 40 then
-        game.forces.enemy.kill_all_units()
+    if old_version < 60 then
+        local old_global = global
+        global = {}
+        global.mod_version = 60
+
+        Harpa.migrate(old_global)
+        World.recalculate_chunk_values()
+        World.resync_players()
         global.bases = {}
         for _, spawner in pairs(Surface.find_all_entities({ type = 'unit-spawner', surface = 'nauvis' })) do
             -- may already be dead if it was discovered and killed
@@ -40,28 +46,6 @@ function World.migrate(old_version, new_version)
                     BiterBase.discover(spawner)
                 end
             end
-        end
-    end
-    if old_version < 41 then
-        for i = #global.bases, 1, -1 do
-            local base = global.bases[i]
-            base.target = nil
-        end
-        if global.overmind then
-            global.overmind.currency = 0
-        end
-    end
-    if old_version < 42 then
-        World.recalculate_chunk_values()
-        for i = #global.bases, 1, -1 do
-            local base = global.bases[i]
-            base.targets = nil
-            BiterBase.set_active_plan(base, 'idle')
-        end
-    end
-    if old_version < 43 then
-        if global.overmind then
-            global.overmind = nil
         end
     end
 end
@@ -84,6 +68,19 @@ function World.resync_players()
     for _, player in pairs(game.players) do
         table.insert(global.players, player)
     end
+end
+
+function World.closest_player_character(surface, pos, dist)
+    local closest_char = nil
+    local closest = dist * dist
+    for _, character in pairs(World.all_characters(surface)) do
+        local dist_squared = Position.distance_squared(pos, character.position)
+        if dist_squared < closest then
+            closest_char = character
+            closest = dist_squared
+        end
+    end
+    return closest_char
 end
 
 Event.register(defines.events.on_player_created, World.resync_players)

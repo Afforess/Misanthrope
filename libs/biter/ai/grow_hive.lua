@@ -19,7 +19,7 @@ GrowHive.stages.build_hive = function(base, data)
         local hive = surface.create_entity({name = data.hive_type, position = entity_pos, direction = math.random(7), force = base.queen.force})
         table.insert(base.hives, hive)
         Log("Successfully spawned a new hive at %s", base, serpent.line(hive.position))
-        game.evolution_factor = game.evolution_factor - 0.0025
+        game.evolution_factor = math.max(0, game.evolution_factor - 0.0025)
         return 'success'
     end
 
@@ -40,7 +40,7 @@ function GrowHive.tick(base, data)
 end
 
 function GrowHive.is_expired(base, data)
-    return data.search_distance > 10 or data.stage == 'success'
+    return data.search_distance > 12 or data.stage == 'success'
 end
 
 function GrowHive.initialize(base, data)

@@ -43,7 +43,6 @@ Event.register(defines.events.on_tick, function(event)
         global.overmind.tracked_entities = table.filter(global.overmind.tracked_entities, function(entity_data) return entity_data.entity.valid end)
     end
 
-
     local prev_stage = global.overmind.stage
     local data = global.overmind.data
     local stage = Overmind.stages[prev_stage](data)
@@ -51,32 +50,96 @@ Event.register(defines.events.on_tick, function(event)
         global.overmind.data = {}
     end
     global.overmind.stage = stage
+    Log("Updating stage from %s to %s", prev_stage, stage)
     if prev_stage ~= stage then
-        Log("Updating stage from %s to %s", prev_stage, stage)
         global.overmind.tick_rate = Overmind.tick_rates[stage]
     end
 end)
 
-Overmind.tick_rates.decide = Time.MINUTE * 2
+Overmind.tick_rates.decide = 600
 Overmind.stages.decide = function(data)
     Log("Overmind currency: %d, Valuable Chunks: %d", math.floor(global.overmind.currency), #global.overwatch.valuable_chunks)
     if #global.overwatch.valuable_chunks > 0 then
         if global.overmind.currency > 10000 then
-            if math.random(100) > 90 then
+            if math.random(100) < 50 then
+                Log("Overmind selects early biter spawn")
                 global.overmind.currency = global.overmind.currency - 3000
                 return 'spawn_biters'
             end
 
-            if math.random(100) > 50 then
+            -- Early
+            if math.random(100) < 33 and game.evolution_factor < 0.33 then
+                Log("Overmind selects early evolution factor boost")
+                global.overmind.currency = global.overmind.currency - 10000
+                data.extra_factor = 0.0000125
+                data.iterations = 3200
+                return 'increase_evolution_factor'
+            end
+
+            if math.random(100) < 25 then
+                Log("Overmind selects spread hive spawner")
                 global.overmind.currency = global.overmind.currency - 10000
                 return 'spread_spawner'
             end
+
+            if math.random(100) < 25 and global.overmind.currency > 50000 then
+                Log("Overmind selects donate currency to poor")
+                global.overmind.currency = global.overmind.currency - 10000
+                return 'donate_currency_to_poor'
+            end
+
+            if math.random(100) < 33 and game.evolution_factor < 0.8 then
+                Log("Overmind selects late evolution factor boost")
+                global.overmind.currency = global.overmind.currency - 10000
+                data.extra_factor = 0.0000125
+                data.iterations = 3200
+                return 'increase_evolution_factor'
+            end
+
         end
     end
     return 'decide'
 end
 
-Overmind.tick_rates.spawn_biters = Time.MINUTE * 2
+Overmind.tick_rates.donate_currency_to_poor = Time.MINUTE * 1
+Overmind.stages.donate_currency_to_poor = function(data)
+    if not data.iterations then
+        data.iterations = 1
+    end
+    if global.overmind.currency > 10000 then
+        local start_currency = global.overmind.currency
+        table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
+            if base.currency.amt < 6000 and global.overmind.currency > 1000 then
+                base.currency.amt = base.currency.amt + 1000
+                global.overmind.currency = global.overmind.currency - 1000
+            end
+        end)
+        data.iterations = data.iterations + 1
+        if data.iterations > 10 then
+            return 'decide'
+        end
+        -- successfully found donation targets
+        if start_currency > global.overmind.currency then
+            return 'donate_currency_to_poor'
+        end
+    end
+
+    return 'decide'
+end
+
+Overmind.tick_rates.increase_evolution_factor = 10
+Overmind.stages.increase_evolution_factor = function(data)
+    if data.iterations > 0 then
+        data.iterations = data.iterations - 1
+        game.evolution_factor = game.evolution_factor + data.extra_factor
+        return 'increase_evolution_factor'
+    end
+
+    data.reset = true
+    return 'decide'
+end
+
+Overmind.tick_rates.spawn_biters = Time.MINUTE
 Overmind.stages.spawn_biters = function(data)
     Log("Attempting to spawn biters, total valuable chunks: %d", #global.overwatch.valuable_chunks)
     local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.best_target ~= nil end)
@@ -95,8 +158,12 @@ Overmind.stages.spawn_biters = function(data)
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
     local surface = global.overwatch.surface
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 0 then
-        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 2), force = game.forces.player}) > 16 then
+        Log("Chunk %s had > 16 player entities within 2 chunks", serpent.line(chunk))
+        return 'decide'
+    end
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 100 then
+        Log("Chunk %s had > 100 player entities within 4 chunks", serpent.line(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
@@ -159,8 +226,12 @@ Overmind.stages.spread_spawner = function(data)
 
     local surface = global.overwatch.surface
     local area = Chunk.to_area(chunk)
-    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 8 then
-        Log("Chunk %s had player entities within 4 chunks", serpent.line(chunk))
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 2), force = game.forces.player}) > 16 then
+        Log("Chunk %s had > 16 player entities within 2 chunks", serpent.line(chunk))
+        return 'decide'
+    end
+    if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 100 then
+        Log("Chunk %s had > 100 player entities within 4 chunks", serpent.line(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then

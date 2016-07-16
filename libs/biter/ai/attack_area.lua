@@ -94,8 +94,8 @@ end
 
 function AttackArea.initialize(base, data)
     data.attack_group_size = math.floor(10 + game.evolution_factor / 0.025)
-    if base.currency > BiterBase.plans.attack_area.cost * 2 then
-        base.currency = base.currency - BiterBase.plans.attack_area.cost
+    if base:get_currency(false) > BiterBase.plans.attack_area.cost * 2 then
+        base:spend_currency(BiterBase.plans.attack_area.cost)
         data.attack_group_size = data.attack_group_size + math.floor(15 + game.evolution_factor / 0.02)
     end
     Log("Attack group size: %d", base, data.attack_group_size)

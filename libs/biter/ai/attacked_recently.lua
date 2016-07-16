@@ -12,7 +12,7 @@ function AttackedRecently.tick(base, data)
         end
 
         if #biters > 0 then
-            local closest_player = AttackedRecently.closest_player_character(surface, base.queen.position, 56)
+            local closest_player = World.closest_player_character(surface, base.queen.position, 56)
             local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = 'enemy'})
             for _, biter in pairs(biters) do
                 unit_group.add_member(biter)
@@ -38,19 +38,6 @@ end
 
 function AttackedRecently.is_expired(base, data)
     return base.last_attacked + (Time.MINUTE * 3) < game.tick
-end
-
-function AttackedRecently.closest_player_character(surface, pos, dist)
-    local closest_char = nil
-    local closest = dist * dist
-    for _, character in pairs(World.all_characters(surface)) do
-        local dist_squared = Position.distance_squared(pos, character.position)
-        if dist_squared < closest then
-            closest_char = character
-            closest = dist_squared
-        end
-    end
-    return closest_char
 end
 
 return AttackedRecently

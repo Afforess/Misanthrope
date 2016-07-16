@@ -8,7 +8,7 @@ Event.register(defines.events.on_tick, function(event)
         map_settings.steering.moving.separation_factor = 1
 
         -- cause pollution to spread farther
-        map_settings.pollution.diffusion_ratio = 0.05
+        map_settings.pollution.diffusion_ratio = 0.06
         map_settings.pollution.min_to_diffuse = 10
         map_settings.pollution.expected_max_per_chunk = 6000
 

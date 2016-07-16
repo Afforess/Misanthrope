@@ -40,7 +40,7 @@ function BuildWorm.tick(base, data)
 end
 
 function BuildWorm.is_expired(base, data)
-    return data.search_distance > 7 or data.stage == 'success'
+    return data.search_distance > 14 or data.stage == 'success'
 end
 
 function BuildWorm.initialize(base, data)
