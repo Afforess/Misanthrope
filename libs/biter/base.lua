@@ -39,9 +39,11 @@ function Base.get_entities(self)
 end
 
 function Base.get_prev_entities(self)
-    local plan_data = self.plan.data
-    if plan_data.prev_entities then
-        return table.filter(plan_data.prev_entities, Game.VALID_FILTER)
+    if self.plan then
+        local plan_data = self.plan.data
+        if plan_data.prev_entities then
+            return table.filter(plan_data.prev_entities, Game.VALID_FILTER)
+        end
     end
     return {}
 end
@@ -64,6 +66,13 @@ function Base.wanted_hive_count(self)
     local pollution = self.queen.surface.get_pollution(self.queen.position)
     local pollution_hives = math.floor(math.min(5, pollution / 1000))
     return math.max(0, 1 + evo_factor_hives + pollution_hives - #self:all_hives())
+end
+
+function Base.get_plan_name(self)
+    if self.plan then
+        return self.plan.name
+    end
+    return 'idle'
 end
 
 function Base.wanted_worm_count(self)
@@ -111,6 +120,15 @@ BaseMt.__index = function(tbl, k)
         end
     end
     return nil
+end
+
+function BiterBase.get_base(base)
+    if base then
+        if not getmetatable(base) then
+            setmetatable(base, BaseMt)
+        end
+    end
+    return base
 end
 
 --- Creates a biter base from spawner entity
@@ -208,10 +226,7 @@ Event.register(defines.events.on_tick, function(event)
             local chunk_data = Chunk.get_data(character.surface, {x = chunk_x, y = chunk_y})
             if chunk_data and chunk_data.base then
                 local base = chunk_data.base
-                local plan_name = 'idle'
-                if base.plan then
-                    plan_name = base.plan.name
-                end
+                local plan_name = base:get_plan_name()
                 if plan_name ~= 'alert' and plan_name ~= 'attacked_recently' then
                     BiterBase.set_active_plan(base, 'alert', { alerted_at = game.tick })
                 end
@@ -221,10 +236,10 @@ Event.register(defines.events.on_tick, function(event)
 end)
 
 function BiterBase.tick(base)
-    if not base.plan or base.plan.name == 'idle' then
+    if base:get_plan_name() == 'idle' then
         BiterBase.create_plan(base)
     else
-        local plan_class = BiterBase.plans[base.plan.name].class
+        local plan_class = BiterBase.plans[base:get_plan_name()].class
         if plan_class.is_expired and plan_class.is_expired(base, base.plan.data) then
             BiterBase.set_active_plan(base, 'idle')
         elseif not plan_class.tick(base, base.plan.data) then
@@ -396,7 +411,7 @@ function BiterBase.create_entity(base, surface, entity_data)
     if not base.entities then base.entities = {} end
     table.insert(base.entities, entity)
 
-    if base.plan and not (base.plan.name == 'attacked_recently' or base.plan.name == 'assist_ally') then
+    if not (base:get_plan_name() == 'attacked_recently' or base:get_plan_name() == 'assist_ally') then
         local evo_cost = 0.00000025 * game.entity_prototypes[entity_data.name].max_health
         game.evolution_factor = game.evolution_factor - evo_cost
     end
@@ -444,9 +459,9 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
         local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
         Log("Trigger entity created, chunk_data: %s", serpent.block(data, {comment = false}))
         if data and data.base then
-            local base = data.base
+            local base = BiterBase.get_base(data.base)
             base.last_attacked = event.tick
-            if base.plan.name ~= 'attacked_recently' then
+            if base:get_plan_name() ~= 'attacked_recently' then
                 BiterBase.set_active_plan(base, 'attacked_recently')
 
                 -- if we can afford it, recruit allies!
@@ -458,8 +473,9 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
                     local cost = BiterBase.plans.assist_ally.cost
                     local pos = base.queen.position
                     local hives = table.filter(global.bases, function(ally_base)
+                        ally_base = BiterBase.get_base(ally_base)
                         if ally_base ~= base and ally_base.valid and ally_base.queen.valid and Position.distance_squared(pos, ally_base.queen.position) < 50000 then
-                            return ally_base.plan.name ~='attacked_recently'
+                            return ally_base:get_plan_name() ~='attacked_recently'
                         end
                     end)
                     table.each(hives, function(ally_base)
@@ -480,15 +496,12 @@ Event.register(defines.events.on_tick, function(event)
     local tick = event.tick
     if global.bases and tick % 60 == 0 then
         for i = #global.bases, 1, -1 do
-            local base = global.bases[i]
+            local base = BiterBase.get_base(global.bases[i])
             if not base.queen.valid then
                 BiterBase.on_queen_death(base)
             else
                 base.currency.amt = base.currency.amt + 1 + #base.hives
                 if base.next_tick < tick then
-                    if not getmetatable(base) then
-                        setmetatable(base, BaseMt)
-                    end
                     BiterBase.tick(base)
                 end
             end
