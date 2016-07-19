@@ -96,8 +96,8 @@ Event.register(defines.events.on_tick, function(event)
 
     if not global.evo_gui.detected then
         EvoGUI.setup()
-        if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.remove_remote_sensor and remote.interfaces.EvoGUI.does_remote_sensor_exist then
-            if remote.call("EvoGUI", "does_remote_sensor_exist", "evolution_state") then
+        if remote.interfaces.EvoGUI and remote.interfaces.EvoGUI.remove_remote_sensor and remote.interfaces.EvoGUI.has_remote_sensor then
+            if remote.call("EvoGUI", "has_remote_sensor", "evolution_state") then
                 remote.call("EvoGUI", "remove_remote_sensor", "evolution_state")
             end
         end
