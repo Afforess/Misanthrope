@@ -225,7 +225,7 @@ Event.register(defines.events.on_tick, function(event)
         for chunk_x, chunk_y in Area.iterate(alert_area) do
             local chunk_data = Chunk.get_data(character.surface, {x = chunk_x, y = chunk_y})
             if chunk_data and chunk_data.base then
-                local base = chunk_data.base
+                local base = BiterBase.get_base(chunk_data.base)
                 local plan_name = base:get_plan_name()
                 if plan_name ~= 'alert' and plan_name ~= 'attacked_recently' then
                     BiterBase.set_active_plan(base, 'alert', { alerted_at = game.tick })
