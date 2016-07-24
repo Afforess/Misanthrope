@@ -474,14 +474,13 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
         if data and data.base then
             local base = BiterBase.get_base(data.base)
             base.last_attacked = event.tick
+            if not base.queen.valid then
+                return
+            end
             if base:get_plan_name() ~= 'attacked_recently' then
                 BiterBase.set_active_plan(base, 'attacked_recently')
 
                 -- if we can afford it, recruit allies!
-                base.currency.savings = 10000
-                LogAI("Under Attack!", base)
-                LogAI("Currency: %s", base, serpent.line(base.currency))
-
                 if base:get_currency(true) > BiterBase.plans.assist_ally.cost then
                     local cost = BiterBase.plans.assist_ally.cost
                     local pos = base.queen.position
