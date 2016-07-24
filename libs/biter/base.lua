@@ -236,14 +236,26 @@ Event.register(defines.events.on_tick, function(event)
 end)
 
 function BiterBase.tick(base)
-    if base:get_plan_name() == 'idle' then
+    local plan_name = base:get_plan_name()
+    if plan_name == 'idle' then
         BiterBase.create_plan(base)
     else
-        local plan_class = BiterBase.plans[base:get_plan_name()].class
+        local passive = BiterBase.plans[plan_name].passive
+        local plan_class = BiterBase.plans[plan_name].class
         if plan_class.is_expired and plan_class.is_expired(base, base.plan.data) then
-            BiterBase.set_active_plan(base, 'idle')
+            -- allow passive plans to go straight to idle, otherwise go to a no_op plan to let any biters
+            -- spawned by an aggressive plan exist for a few more minutes and fulfill any last commands
+            if plan_name == 'no_op' or passive then
+                BiterBase.set_active_plan(base, 'idle')
+            else
+                BiterBase.set_active_plan(base, 'no_op')
+            end
         elseif not plan_class.tick(base, base.plan.data) then
-            BiterBase.set_active_plan(base, 'idle')
+            if plan_name == 'no_op' or passive then
+                BiterBase.set_active_plan(base, 'idle')
+            else
+                BiterBase.set_active_plan(base, 'no_op')
+            end
         end
     end
 end
@@ -270,17 +282,18 @@ function BiterBase.is_in_active_chunk(base)
 end
 
 BiterBase.plans = {
-    idle = { passive = true, cost = 1, update_frequency = 60 * 60 },
-    identify_targets = { passive = true, cost = 500, update_frequency = 120, class = require 'libs/biter/ai/identify_targets' },
-    attack_area = { passive = false, cost = 3000, update_frequency = 300, class = require 'libs/biter/ai/attack_area'},
-    harrassment = { passive = false, cost = 7000, update_frequency = 480, class = require 'libs/biter/ai/harrassment'},
-    attacked_recently = { passive = false, cost = 240, update_frequency = 120, class = require 'libs/biter/ai/attacked_recently' },
-    alert = { passive = false, cost = 120, update_frequency = 180, class = require 'libs/biter/ai/alert' },
-    grow_hive = { passive = true, cost = 2000, update_frequency = 300, class = require 'libs/biter/ai/grow_hive' },
-    build_worm = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/build_worm' },
-    donate_currency = { passive = true, cost = 1000, update_frequency = 300, class = require 'libs/biter/ai/donate_currency' },
-    save_currency = { passive = true, cost = 0, update_frequency = 600, class = require 'libs/biter/ai/save_currency' },
-    assist_ally = { passive = false, cost = 2000, update_frequency = 200, class = require 'libs/biter/ai/assist_ally' },
+    idle = { passive = true, cost = 1, update_frequency = 3600 },
+    no_op = { passive = false, cost = 1, update_frequency = 3600, class = require 'libs/biter/ai/no_op' },
+    identify_targets = { passive = true, cost = 500, update_frequency = 240, class = require 'libs/biter/ai/identify_targets' },
+    attack_area = { passive = false, cost = 3000, update_frequency = 450, class = require 'libs/biter/ai/attack_area'},
+    harrassment = { passive = false, cost = 7000, update_frequency = 600, class = require 'libs/biter/ai/harrassment'},
+    attacked_recently = { passive = false, cost = 240, update_frequency = 240, class = require 'libs/biter/ai/attacked_recently' },
+    alert = { passive = false, cost = 120, update_frequency = 600, class = require 'libs/biter/ai/alert' },
+    grow_hive = { passive = true, cost = 2000, update_frequency = 600, class = require 'libs/biter/ai/grow_hive' },
+    build_worm = { passive = true, cost = 1000, update_frequency = 600, class = require 'libs/biter/ai/build_worm' },
+    donate_currency = { passive = true, cost = 1000, update_frequency = 1800, class = require 'libs/biter/ai/donate_currency' },
+    save_currency = { passive = true, cost = 0, update_frequency = 1800, class = require 'libs/biter/ai/save_currency' },
+    assist_ally = { passive = false, cost = 2000, update_frequency = 450, class = require 'libs/biter/ai/assist_ally' },
 }
 
 function BiterBase.create_plan(base)
@@ -494,15 +507,22 @@ end)
 
 Event.register(defines.events.on_tick, function(event)
     local tick = event.tick
-    if global.bases and tick % 60 == 0 then
-        for i = #global.bases, 1, -1 do
-            local base = BiterBase.get_base(global.bases[i])
-            if not base.queen.valid then
-                BiterBase.on_queen_death(base)
-            else
-                base.currency.amt = base.currency.amt + 1 + #base.hives
-                if base.next_tick < tick then
-                    BiterBase.tick(base)
+    if global.bases then
+        local tick_rate = math.max(60, #global.bases / 150)
+        if event.tick % tick_rate == 0 then
+            for i = #global.bases, 1, -1 do
+                if global.bases[i] then
+                    local base = global.bases[i]
+                    base.currency.amt = base.currency.amt + 1 + #base.hives
+                    if base.next_tick < tick then
+                        -- ensure metatable is set
+                        base = BiterBase.get_base(base)
+                        if not base.queen.valid then
+                            BiterBase.on_queen_death(base)
+                        else
+                            BiterBase.tick(base)
+                        end
+                    end
                 end
             end
         end

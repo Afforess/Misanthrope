@@ -332,7 +332,7 @@ function Harpa.tick_emitter(entity, radius)
             if biter.prototype.max_health < 2500 then
                 local destination = Harpa.nearest_corner(biter_pos, emitter_area, math.random(1, 10), math.random(1, 10))
                 destination = surface.find_non_colliding_position(biter.name, destination, 20, 0.3)
-                command = {type = defines.command.compound, structure_type = defines.compoundcommandtype.logical_and, commands = {
+                command = {type = defines.command.compound, structure_type = defines.compound_command.logical_and, commands = {
                     {type = defines.command.go_to_location, distraction = defines.distraction.by_damage, destination = destination},
                     {type = defines.command.wander}
                 }}

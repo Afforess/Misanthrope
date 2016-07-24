@@ -47,7 +47,7 @@ Overwatch.stages.decide = function(data)
     return 'setup'
 end
 
-Overwatch.tick_rates.scan_chunk = 60
+Overwatch.tick_rates.scan_chunk = 120
 Overwatch.stages.scan_chunk = function(data)
     if #global.overwatch.chunks == 0 then
         return 'decide'
@@ -101,7 +101,7 @@ Overwatch.stages.scan_chunk = function(data)
 end
 
 
-Overwatch.tick_rates.evaluate_base = 10
+Overwatch.tick_rates.evaluate_base = 30
 Overwatch.stages.evaluate_base = function(data)
     local value = math.floor(data.value)
     local nearby_bases = data.nearby_bases
@@ -125,7 +125,7 @@ Overwatch.stages.evaluate_base = function(data)
     return 'scan_chunk'
 end
 
-Overwatch.tick_rates.analyze_base = 3
+Overwatch.tick_rates.analyze_base = 10
 Overwatch.stages.analyze_base = function(data)
     -- finished evaluation
     if #data.adjacent == 0 then
