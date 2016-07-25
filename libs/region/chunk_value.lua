@@ -71,9 +71,9 @@ end
 function World.change_chunk_value(surface, chunk, value, adj_value)
     local chunk_data = Chunk.get_data(surface, chunk, {})
     if chunk_data.player_value then
-        chunk_data.player_value = chunk_data.player_value + value
+        chunk_data.player_value = math.floor(chunk_data.player_value + value)
     else
-        chunk_data.player_value = value
+        chunk_data.player_value = math.floor(value)
     end
     if adj_value ~= 0 then
         for x, y in Area.iterate(Position.expand_to_area(chunk, 1)) do

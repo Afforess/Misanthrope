@@ -108,6 +108,17 @@ function Base.spend_currency(self, amt)
     return wallet.amt
 end
 
+function Base.set_next_tick(self, tick)
+    self.next_tick = tick
+
+    -- register next tick execution
+    local schedule = global.tick_schedule
+    if not schedule[tick] then
+        schedule[tick] = {}
+    end
+    table.insert(schedule[tick], base)
+end
+
 -- Biter Base metatable
 local BaseMt = {}
 BaseMt.__index = function(tbl, k)
@@ -235,13 +246,14 @@ Event.register(defines.events.on_tick, function(event)
     end
 end)
 
-function BiterBase.tick(base)
+function BiterBase.tick(base, current_tick)
     local plan_name = base:get_plan_name()
     if plan_name == 'idle' then
         BiterBase.create_plan(base)
     else
-        local passive = BiterBase.plans[plan_name].passive
-        local plan_class = BiterBase.plans[plan_name].class
+        local plan_specification = BiterBase.plans[plan_name]
+        local passive = plan_specification.passive
+        local plan_class = plan_specification.class
         if plan_class.is_expired and plan_class.is_expired(base, base.plan.data) then
             -- allow passive plans to go straight to idle, otherwise go to a no_op plan to let any biters
             -- spawned by an aggressive plan exist for a few more minutes and fulfill any last commands
@@ -256,6 +268,9 @@ function BiterBase.tick(base)
             else
                 BiterBase.set_active_plan(base, 'no_op')
             end
+        else
+            -- plan ticked Successfully, schedule next plan tick
+            base:set_next_tick(current_tick + plan_specification.update_frequency)
         end
     end
 end
@@ -375,7 +390,7 @@ function BiterBase.create_plan(base)
 end
 
 function BiterBase.set_active_plan(base, plan_name, extra_data)
-    local plan_data = BiterBase.plans[plan_name]
+    local plan_specification = BiterBase.plans[plan_name]
     local data = {}
     if extra_data then
         data = extra_data
@@ -385,7 +400,7 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
     local old_plan = base.plan
     if old_plan then old_plan.valid = false end
     if base.entities then
-        if plan_data.passive then
+        if plan_specification.passive then
             table.each(table.filter(base.entities, Game.VALID_FILTER), function(entity)
                 BiterBase.destroy_entity(entity)
             end)
@@ -405,16 +420,17 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
         setmetatable(base, BaseMt)
     end
     base.plan = { name = plan_name, data = data, valid = true}
-    base:spend_currency(plan_data.cost)
-    base.next_tick = game.tick + plan_data.update_frequency
+    base:spend_currency(plan_specification.cost)
+    base:set_next_tick(game.tick + plan_specification.update_frequency)
+
     if base.history[plan_name] then
         base.history[plan_name] = base.history[plan_name] + 1
     else
         base.history[plan_name] = 1
     end
 
-    if plan_data.class and plan_data.class.initialize then
-        plan_data.class.initialize(base, data)
+    if plan_specification.class and plan_specification.class.initialize then
+        plan_specification.class.initialize(base, data)
     end
 end
 
@@ -505,22 +521,21 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
 end)
 
 Event.register(defines.events.on_tick, function(event)
-    local tick = event.tick
     if global.bases then
-        local tick_rate = math.max(60, #global.bases / 150)
-        if event.tick % tick_rate == 0 then
-            for i = #global.bases, 1, -1 do
-                if global.bases[i] then
-                    local base = global.bases[i]
+        local tick = event.tick
+
+        local tick_schedule = global.tick_schedule[tick]
+        global.tick_schedule[tick] = nil
+        if tick_schedule then
+            for i = #tick_schedule, 1, -1 do
+                if tick_schedule[i] then
+                    local base = BiterBase.get_base(tick_schedule[i])
                     base.currency.amt = base.currency.amt + 1 + #base.hives
-                    if base.next_tick < tick then
-                        -- ensure metatable is set
-                        base = BiterBase.get_base(base)
-                        if not base.queen.valid then
-                            BiterBase.on_queen_death(base)
-                        else
-                            BiterBase.tick(base)
-                        end
+                    -- ensure metatable is set
+                    if not base.queen.valid then
+                        BiterBase.on_queen_death(base)
+                    else
+                        BiterBase.tick(base, tick)
                     end
                 end
             end

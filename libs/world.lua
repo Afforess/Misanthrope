@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 60
+World.version = 64
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -47,6 +47,19 @@ function World.migrate(old_version, new_version)
                 end
             end
         end
+    end
+    if old_version < 64 then
+        global.mod_version = 64
+        global.tick_schedule = {}
+        global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
+            if base.next_tick < game.tick then
+                base.next_tick = game.tick + 60
+            end
+            if not global.tick_schedule[base.next_tick] then
+                global.tick_schedule[base.next_tick] = {}
+            end
+            table.insert(global.tick_schedule[base.next_tick], base)
+        end)
     end
 end
 

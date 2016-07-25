@@ -50,8 +50,8 @@ Event.register(defines.events.on_tick, function(event)
         global.overmind.data = {}
     end
     global.overmind.stage = stage
-    Log("Updating stage from %s to %s", prev_stage, stage)
     if prev_stage ~= stage then
+        Log("Updating stage from %s to %s", prev_stage, stage)
         global.overmind.tick_rate = Overmind.tick_rates[stage]
     end
 end)
