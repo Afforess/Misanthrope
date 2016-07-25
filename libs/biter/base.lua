@@ -289,8 +289,8 @@ function BiterBase.is_in_active_chunk(base)
         end
     end
     LogAI("Closest dist: %d", base, closest_dist)
-    -- if players are > 1000 away, never active
-    if closest_dist > 1000000 then
+    -- if players are > 10000 away, not active
+    if closest_dist > 100000000 then
         return false
     end
     return surface.get_pollution(pos) > 5

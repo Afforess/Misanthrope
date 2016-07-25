@@ -7,5 +7,5 @@
   "homepage": "https://github.com/Afforess/Misanthrope",
   "description": "Vastly improved biter AI behavior, tweaks biter expansion mechanics. Memento mori.",
   "factorio_version": "0.13",
-  "dependencies": ["? EvoGUI"]
+  "dependencies": ["? EvoGUI", "? marathon"]
 }

@@ -42,11 +42,14 @@ for key, prototype_type in pairs(data.raw) do
     for name, prototype in pairs(prototype_type) do
         if prototype.energy_source then
             if prototype.energy_source.emissions and prototype.energy_source.emissions > 0.001 then
+                local multiplier = 7
                 if name:contains('assembling-machine') and not name == 'assembling-machine-1' then
-                    prototype.energy_source.emissions = prototype.energy_source.emissions * 10
-                else
-                    prototype.energy_source.emissions = prototype.energy_source.emissions * 7
+                    multiplier = 10
                 end
+                if marathon then
+                    multiplier = multiplier / 5
+                end
+                prototype.energy_source.emissions = prototype.energy_source.emissions * multiplier
             end
         end
     end
