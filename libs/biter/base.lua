@@ -4,6 +4,7 @@ require 'stdlib/entity/entity'
 require 'stdlib/area/position'
 require 'stdlib/area/area'
 require 'stdlib/table'
+require 'stdlib/time'
 require 'stdlib/game'
 require 'libs/biter/random_name'
 require 'libs/biter/biter'
@@ -26,6 +27,13 @@ BiterBase.LogAI = function (str, base, ...)
     end
     logger.log(string.format(str, ...))
 end
+
+-- disable logging in prod
+if not DEBUG_MODE then
+    BiterBase.LogAI = function() end
+    BiterBase.Logger = function() end
+end
+
 local LogAI = BiterBase.LogAI
 
 -- Biter Base Meta-Methods
@@ -116,7 +124,7 @@ function Base.set_next_tick(self, tick)
     if not schedule[tick] then
         schedule[tick] = {}
     end
-    table.insert(schedule[tick], base)
+    table.insert(schedule[tick], self)
 end
 
 -- Biter Base metatable
@@ -233,6 +241,7 @@ Event.register(defines.events.on_tick, function(event)
     for _, character in pairs(World.all_characters()) do
         local chunk_pos = Chunk.from_position(character.position)
         local alert_area = Position.expand_to_area(chunk_pos, 3)
+
         for chunk_x, chunk_y in Area.iterate(alert_area) do
             local chunk_data = Chunk.get_data(character.surface, {x = chunk_x, y = chunk_y})
             if chunk_data and chunk_data.base then
@@ -243,6 +252,7 @@ Event.register(defines.events.on_tick, function(event)
                 end
             end
         end
+
     end
 end)
 
@@ -301,8 +311,8 @@ BiterBase.plans = {
     no_op = { passive = false, cost = 1, update_frequency = 3600, class = require 'libs/biter/ai/no_op' },
     identify_targets = { passive = true, cost = 500, update_frequency = 240, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 3000, update_frequency = 450, class = require 'libs/biter/ai/attack_area'},
-    harrassment = { passive = false, cost = 7000, update_frequency = 600, class = require 'libs/biter/ai/harrassment'},
-    attacked_recently = { passive = false, cost = 240, update_frequency = 240, class = require 'libs/biter/ai/attacked_recently' },
+    harrassment = { passive = false, cost = 7000, update_frequency = 400, class = require 'libs/biter/ai/harrassment'},
+    attacked_recently = { passive = false, cost = 240, update_frequency = 300, class = require 'libs/biter/ai/attacked_recently' },
     alert = { passive = false, cost = 120, update_frequency = 600, class = require 'libs/biter/ai/alert' },
     grow_hive = { passive = true, cost = 2000, update_frequency = 600, class = require 'libs/biter/ai/grow_hive' },
     build_worm = { passive = true, cost = 1000, update_frequency = 600, class = require 'libs/biter/ai/build_worm' },
@@ -326,7 +336,8 @@ function BiterBase.create_plan(base)
         end
 
         local age = game.tick - base.targets.tick
-        if math.random(1000) < (age / Time.MINUTE) then
+        -- one chance in 1000 for every 3 minutes the targets have aged
+        if math.random(1000) < (age / (Time.MINUTE * 3)) then
             LogAI("Recalculating targets, previous target is %s minutes old", base, serpent.line((age / Time.MINUTE)))
             BiterBase.set_active_plan(base, 'identify_targets')
             return true
@@ -339,18 +350,20 @@ function BiterBase.create_plan(base)
         return true
     end
 
-    if math.random(100) < 5 and base:can_afford('donate_currency') then
-        LogAI("Choosing to donate currency to the overmind AI", base)
-        BiterBase.set_active_plan(base, 'donate_currency')
-        return true
-    end
+    if global.overmind and global.overmind.currency < 100000 then
+        if math.random(100) < 5 and base:can_afford('donate_currency') then
+            LogAI("Choosing to donate currency to the overmind AI", base)
+            BiterBase.set_active_plan(base, 'donate_currency')
+            return true
+        end
 
-    local active_chunk = BiterBase.is_in_active_chunk(base)
-    if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
-    if not active_chunk and math.random(100) > 20 and base:can_afford('donate_currency') then
-        LogAI("Choosing to donate currency to the overmind AI", base)
-        BiterBase.set_active_plan(base, 'donate_currency')
-        return true
+        local active_chunk = BiterBase.is_in_active_chunk(base)
+        if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
+        if not active_chunk and math.random(100) > 20 and base:can_afford('donate_currency') then
+            LogAI("Choosing to donate currency to the overmind AI", base)
+            BiterBase.set_active_plan(base, 'donate_currency')
+            return true
+        end
     end
 
     if math.random(100) > 60 then
@@ -371,8 +384,14 @@ function BiterBase.create_plan(base)
 
     local evo_factor = game.evolution_factor * 100
 
-    if evo_factor > 30 and math.random(100) < 5 and base:can_afford('harrassment') and base.targets then
-        if active_chunk then
+    if active_chunk and base:can_afford('harrassment') and base.targets then
+        local rand = math.random(100)
+        if evo_factor > 33 and rand < 7 then
+            BiterBase.set_active_plan(base, 'harrassment')
+            return true
+        end
+
+        if evo_factor > 66 and rand < 15 then
             BiterBase.set_active_plan(base, 'harrassment')
             return true
         end
@@ -441,7 +460,7 @@ function BiterBase.create_entity(base, surface, entity_data)
     table.insert(base.entities, entity)
 
     if not (base:get_plan_name() == 'attacked_recently' or base:get_plan_name() == 'assist_ally') then
-        local evo_cost = 0.00000025 * game.entity_prototypes[entity_data.name].max_health
+        local evo_cost = 0.0000000625 * game.entity_prototypes[entity_data.name].max_health
         game.evolution_factor = game.evolution_factor - evo_cost
     end
     return entity
@@ -451,7 +470,7 @@ function BiterBase.destroy_entity(entity)
     if not entity or not entity.valid then
         return
     end
-    local evo_cost = 0.00000025 * game.entity_prototypes[entity.name].max_health
+    local evo_cost = 0.0000000625 * game.entity_prototypes[entity.name].max_health
     game.evolution_factor = game.evolution_factor + evo_cost
     entity.destroy()
 end

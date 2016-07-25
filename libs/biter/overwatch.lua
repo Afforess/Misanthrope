@@ -62,7 +62,7 @@ Overwatch.stages.scan_chunk = function(data)
     local chunk_center = Area.center(area)
 
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
-        Log("Chunk %s had biter spawners within 2 chunks", serpent.line(chunk))
+        Log("Chunk %s had biter spawners within 2 chunks", Chunk.to_string(chunk))
         return 'scan_chunk'
     end
 
@@ -70,10 +70,10 @@ Overwatch.stages.scan_chunk = function(data)
     if not pos or not Area.inside(area, pos) then
         local pos = surface.find_non_colliding_position('medium-biter', chunk_center, 16, 1)
         if not pos or not Area.inside(area, pos) then
-            Log("Chunk %s had no suitable location for spawner or biter", serpent.line(chunk))
+            Log("Chunk %s had no suitable location for spawner or biter", Chunk.to_string(chunk))
             return 'scan_chunk'
         else
-            Log("Chunk %s had no suitable location for spawner, but may support spawning biters", serpent.line(chunk))
+            Log("Chunk %s had no suitable location for spawner, but may support spawning biters", Chunk.to_string(chunk))
             data.chunk = chunk
             data.adjacent = {}
             data.spawn = false
@@ -86,7 +86,7 @@ Overwatch.stages.scan_chunk = function(data)
             return 'analyze_base'
         end
     end
-    Log("Chunk %s had a suitable location for spawner", serpent.line(chunk))
+    Log("Chunk %s had a suitable location for spawner", Chunk.to_string(chunk))
     data.chunk = chunk
     data.adjacent = {}
     data.spawn = true
@@ -116,10 +116,10 @@ Overwatch.stages.evaluate_base = function(data)
 
     value = math.floor(value)
     if value > 1000 then
-        Log("Finished evaluating chunk %s, its value is %d", serpent.line(data.chunk), value)
+        Log("Finished evaluating chunk %s, its value is %d", Chunk.to_string(data.chunk), value)
         table.insert(global.overwatch.valuable_chunks, { chunk = data.chunk, value = value, spawn = data.spawn, best_target = data.best })
     else
-        Log("Finished evaluating chunk %s, value too low, its value is %d", serpent.line(data.chunk), value)
+        Log("Finished evaluating chunk %s, value too low, its value is %d", Chunk.to_string(data.chunk), value)
     end
     data.reset = true
     return 'scan_chunk'

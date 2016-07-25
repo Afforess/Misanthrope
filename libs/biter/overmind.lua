@@ -61,6 +61,15 @@ Overmind.stages.decide = function(data)
     Log("Overmind currency: %d, Valuable Chunks: %d", math.floor(global.overmind.currency), #global.overwatch.valuable_chunks)
     if #global.overwatch.valuable_chunks > 0 then
         if global.overmind.currency > 10000 then
+
+            if global.overmind.currency > 100000 then
+                if math.random(100) < 75 then
+                    Log("Overmind selects spread early and expensive hive spawner")
+                    global.overmind.currency = global.overmind.currency - 25000
+                    return 'fast_spread_spawner'
+                end
+            end
+
             if math.random(100) < 50 then
                 Log("Overmind selects early biter spawn")
                 global.overmind.currency = global.overmind.currency - 3000
@@ -153,21 +162,21 @@ Overmind.stages.spawn_biters = function(data)
     local chunk_data = spawnable_chunks[1]
     local chunk = chunk_data.chunk
     global.overwatch.valuable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
-    Log("Choose chunk %s to spawn units on, remaining valuable chunks: %d", serpent.line(chunk), #global.overwatch.valuable_chunks)
+    Log("Choose chunk %s to spawn units on, remaining valuable chunks: %d", Chunk.to_string(chunk), #global.overwatch.valuable_chunks)
 
     local area = Chunk.to_area(chunk)
     local chunk_center = Area.center(area)
     local surface = global.overwatch.surface
     if surface.count_entities_filtered({area = Area.expand(area, 32 * 2), force = game.forces.player}) > 16 then
-        Log("Chunk %s had > 16 player entities within 2 chunks", serpent.line(chunk))
+        Log("Chunk %s had > 16 player entities within 2 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 100 then
-        Log("Chunk %s had > 100 player entities within 4 chunks", serpent.line(chunk))
+        Log("Chunk %s had > 100 player entities within 4 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
-        Log("Chunk %s had biter spawners within 2 chunks", serpent.line(chunk))
+        Log("Chunk %s had biter spawners within 2 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
 
@@ -193,7 +202,7 @@ Overmind.stages.spawn_biters = function(data)
             end
         end
     end
-    Log("Spawned %d units at chunk %s, to attack %s", unit_count, serpent.line(chunk), serpent.line(chunk_data.best_target))
+    Log("Spawned %d units at chunk %s, to attack %s", unit_count, Chunk.to_string(chunk), serpent.line(chunk_data.best_target))
     if #biters > 0 then
         local unit_group = surface.create_unit_group({position = biters[1].position, force = 'enemy'})
         for _, biter in pairs(biters) do
@@ -222,20 +231,20 @@ Overmind.stages.spread_spawner = function(data)
     local chunk_data = spawnable_chunks[1]
     local chunk = chunk_data.chunk
     global.overwatch.valuable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.chunk.x ~= chunk.x and data.chunk.y ~= chunk.y end)
-    Log("Choose chunk %s to spawn a new base, remaining valuable chunks: %d", serpent.line(chunk), #global.overwatch.valuable_chunks)
+    Log("Choose chunk %s to spawn a new base, remaining valuable chunks: %d", Chunk.to_string(chunk), #global.overwatch.valuable_chunks)
 
     local surface = global.overwatch.surface
     local area = Chunk.to_area(chunk)
     if surface.count_entities_filtered({area = Area.expand(area, 32 * 2), force = game.forces.player}) > 16 then
-        Log("Chunk %s had > 16 player entities within 2 chunks", serpent.line(chunk))
+        Log("Chunk %s had > 16 player entities within 2 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({area = Area.expand(area, 32 * 4), force = game.forces.player}) > 100 then
-        Log("Chunk %s had > 100 player entities within 4 chunks", serpent.line(chunk))
+        Log("Chunk %s had > 100 player entities within 4 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
     if surface.count_entities_filtered({type = 'unit-spawner', area = Area.expand(area, 64), force = game.forces.enemy}) > 0 then
-        Log("Chunk %s had biter spawners within 2 chunks", serpent.line(chunk))
+        Log("Chunk %s had biter spawners within 2 chunks", Chunk.to_string(chunk))
         return 'decide'
     end
 
@@ -246,8 +255,11 @@ Overmind.stages.spread_spawner = function(data)
         local base = BiterBase.discover(queen)
         Log("Successfully spawned a new base: %s", BiterBase.tostring(base))
     else
-        Log("Unable to spawn new base at chunk %s", serpent.line(chunk))
+        Log("Unable to spawn new base at chunk %s", Chunk.to_string(chunk))
     end
 
     return 'decide'
 end
+
+Overmind.tick_rates.fast_spread_spawner = Time.MINUTE / 6
+Overmind.stages.fast_spread_spawner = Overmind.stages.spread_spawner

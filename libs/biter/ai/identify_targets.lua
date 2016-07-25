@@ -3,28 +3,22 @@ require 'libs/pathfinding_engine'
 local IdentifyTargets = {stages = {}}
 local Log = function(str, ...) BiterBase.LogAI("[IdentifyTargets] " .. str, ...) end
 
-IdentifyTargets.search_radius = 20
-IdentifyTargets.max_search_queue_size = (IdentifyTargets.search_radius + 1) * (IdentifyTargets.search_radius + 1)
-IdentifyTargets.cache = {}
+IdentifyTargets.search_radius = 40
+IdentifyTargets.search_queue = {}
+for dx, dy in Area.spiral_iterate(Position.expand_to_area({0, 0}, IdentifyTargets.search_radius)) do
+    table.insert(IdentifyTargets.search_queue, {x = dx, y = dy})
+end
+IdentifyTargets.search_queue_size = #IdentifyTargets.search_queue
 
-function IdentifyTargets.get_search_queue(data)
-    local search_area = Position.expand_to_area(data.chunk_pos, IdentifyTargets.search_radius)
-    for _, value in pairs(IdentifyTargets.cache) do
-        if value.pos.x == data.chunk_pos.x and value.pos.y == data.chunk_pos.y then
-            return value.search_queue
-        end
-    end
-    local search_queue = {}
-    for x, y in Area.spiral_iterate(search_area) do
-        table.insert(search_queue, {x = x, y = y})
-    end
-    table.insert(IdentifyTargets.cache, {pos = data.chunk_pos, search_queue = search_queue})
-    return search_queue
+function IdentifyTargets.search_queue_chunk(data)
+    local idx = data.search_idx
+    local center = data.start_chunk
+    local delta_pos = IdentifyTargets.search_queue[idx]
+    return { x = center.x + delta_pos.x, y = center.y + delta_pos.y }
 end
 
 IdentifyTargets.stages.setup = function(base, data)
     local chunk_pos = Chunk.from_position(base.queen.position)
-    data.chunk_pos = chunk_pos
     data.start_chunk = chunk_pos
     data.search_idx = 1
     data.candidates = {}
@@ -34,10 +28,10 @@ IdentifyTargets.stages.setup = function(base, data)
 end
 
 IdentifyTargets.stages.search = function(base, data)
-    if data.search_idx > IdentifyTargets.max_search_queue_size then
+    if data.search_idx > IdentifyTargets.search_queue_size then
         return 'sort'
     end
-    local chunk_pos = IdentifyTargets.get_search_queue(data)[data.search_idx]
+    local chunk_pos = IdentifyTargets.search_queue_chunk(data)
 
     local chunk_data = Chunk.get_data(base.queen.surface, chunk_pos)
     if chunk_data and chunk_data.player_value and chunk_data.player_value > 0 then

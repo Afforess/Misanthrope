@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 64
+World.version = 67
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -48,8 +48,8 @@ function World.migrate(old_version, new_version)
             end
         end
     end
-    if old_version < 64 then
-        global.mod_version = 64
+    if old_version < 67 then
+        global.mod_version = 67
         global.tick_schedule = {}
         global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
             if base.next_tick < game.tick then
@@ -100,9 +100,6 @@ Event.register(defines.events.on_player_created, World.resync_players)
 
 Event.register({Event.core_events.init, Event.core_events.configuration_changed}, function(event)
     Log("Setting up world...")
-    if event.data then
-        Log("Mod data: %s", serpent.line(event.data))
-    end
     World.setup()
     Log("World setup complete.")
 end)

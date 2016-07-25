@@ -69,21 +69,6 @@ function EvoGUI.setup()
             text = "Evolution Rate:",
             caption = "Evolution Rate"
         })
-        if DEBUG_MODE then
-            remote.call("EvoGUI", "create_remote_sensor", {
-                mod_name = "Misanthrope",
-                name = "biter_scent",
-                text = "Biter Scent:",
-                caption = "Biter Scent"
-            })
-
-            remote.call("EvoGUI", "create_remote_sensor", {
-                mod_name = "Misanthrope",
-                name = "chunk_value",
-                text = "Chunk Value:",
-                caption = "Chunk Value"
-            })
-        end
         EvoGUI.update_gui()
     end
 end
@@ -103,7 +88,7 @@ Event.register(defines.events.on_tick, function(event)
         end
     end
 
-    if global.evo_gui.detected and event.tick % 10 == 0 then
+    if global.evo_gui.detected and event.tick % 20 == 0 then
         if remote.interfaces.EvoGUI then
             EvoGUI.update_gui()
             global.exponential_moving_average = global.exponential_moving_average + (0.8 * (game.evolution_factor - global.exponential_moving_average))
@@ -113,10 +98,6 @@ end)
 
 function EvoGUI.update_gui()
     remote.call("EvoGUI", "update_remote_sensor", "evolution_rate", EvoGUI.create_evolution_rate_text(), EvoGUI.create_evolution_rate_color())
-    if DEBUG_MODE then
-        remote.call("EvoGUI", "update_remote_sensor", "biter_scent", EvoGUI.create_biter_scent_text())
-        remote.call("EvoGUI", "update_remote_sensor", "chunk_value", EvoGUI.create_chunk_value_text())
-    end
 end
 
 return EvoGUI
