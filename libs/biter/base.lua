@@ -474,8 +474,7 @@ function BiterBase.create_entity(base, surface, entity_data)
     table.insert(base.entities, entity)
 
     if not (base:get_plan_name() == 'attacked_recently' or base:get_plan_name() == 'assist_ally') then
-        local evo_cost = 0.0000000625 * game.entity_prototypes[entity_data.name].max_health / 1000
-        game.evolution_factor = game.evolution_factor - evo_cost
+        game.evolution_factor = game.evolution_factor - 0.0000000625
     end
     return entity
 end
@@ -484,8 +483,7 @@ function BiterBase.destroy_entity(entity)
     if not entity or not entity.valid then
         return
     end
-    local evo_cost = 0.0000000625 * game.entity_prototypes[entity.name].max_health / 1000
-    game.evolution_factor = game.evolution_factor + evo_cost
+    game.evolution_factor = game.evolution_factor + 0.0000000625
     entity.destroy()
 end
 

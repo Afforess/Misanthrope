@@ -22,7 +22,7 @@ function AbandonHive.tick(base, data)
         base.queen.destroy()
     end
     if game.evolution_factor < 0.8 then
-        game.evolution_factor = math.max(1, game.evolution_factor + 0.00001)
+        game.evolution_factor = math.min(1, game.evolution_factor + 0.0001)
     end
     base.valid = false
 
