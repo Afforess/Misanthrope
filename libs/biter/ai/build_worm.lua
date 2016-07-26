@@ -19,7 +19,7 @@ BuildWorm.stages.build_worm = function(base, data)
         local worm = surface.create_entity({name = data.worm_type, position = entity_pos, force = base.queen.force})
         table.insert(base.worms, worm)
         Log("Successfully spawned a new worm at %s", base, string.line(worm.position))
-        game.evolution_factor = math.max(0, game.evolution_factor - 0.001)
+        game.evolution_factor = math.max(0, game.evolution_factor - 0.00001)
         return 'success'
     end
 
