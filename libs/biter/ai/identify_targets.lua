@@ -55,7 +55,7 @@ IdentifyTargets.stages.sort = function(base, data)
         return b.value < a.value
     end)
 
-    Log("All candidates: %s", base, serpent.block(data.candidates))
+    Log("All candidates: %s", base, string.block(data.candidates))
     data.candidates = table.filter(data.candidates, function(candidate)
         return candidate.value > 100
     end)
@@ -64,7 +64,7 @@ IdentifyTargets.stages.sort = function(base, data)
         base.targets = { candidates = {}, tick = game.tick }
         return 'fail'
     end
-    Log("Filtered candidates: %s", base, serpent.block(data.candidates))
+    Log("Filtered candidates: %s", base, string.block(data.candidates))
 
     base.targets = { candidates = data.candidates, tick = game.tick }
     return 'success'

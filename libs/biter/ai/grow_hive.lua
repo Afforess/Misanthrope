@@ -18,7 +18,7 @@ GrowHive.stages.build_hive = function(base, data)
     if entity_pos and Position.distance(pos, entity_pos) <= data.search_distance then
         local hive = surface.create_entity({name = data.hive_type, position = entity_pos, direction = math.random(7), force = base.queen.force})
         table.insert(base.hives, hive)
-        Log("Successfully spawned a new hive at %s", base, serpent.line(hive.position))
+        Log("Successfully spawned a new hive at %s", base, string.line(hive.position))
         game.evolution_factor = math.max(0, game.evolution_factor - 0.0025)
         return 'success'
     end

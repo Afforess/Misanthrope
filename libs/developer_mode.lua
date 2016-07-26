@@ -41,7 +41,7 @@ Gui.on_click('misanthrope_debug_toggle', function(event)
             item_frame.add({type = 'checkbox', name = setting_name .. 'checkbox', state = DeveloperMode.get_gui_setting(setting_name, default_val)})
         end
         local biter_frame = frame.add({type = 'frame', name = 'biter_ai_frame', style = 'frame_in_right_container_style', direction = 'vertical'})
-        
+
         frame.add({type = 'button', name = 'close_misanthrope_frame', caption = {'gui.misanthrope.close'}})
         frame.add({type = 'button', name = 'disable_developer_mode', caption = {'gui.misanthrope.disable_developer_mode'}})
     end
@@ -68,7 +68,7 @@ local checkbox_func = function(event)
         element.state = true
         DeveloperMode.set_gui_setting(setting_name, true)
     end
-    World.Logger.log("Misanthrope settings: " .. serpent.block(global.settings))
+    World.Logger.log("Misanthrope settings: " .. string.block(global.settings))
 end
 
 Gui.on_click('biter_ai_checkbox', checkbox_func)

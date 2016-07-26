@@ -100,7 +100,6 @@ Overwatch.stages.scan_chunk = function(data)
     return 'analyze_base'
 end
 
-
 Overwatch.tick_rates.evaluate_base = 30
 Overwatch.stages.evaluate_base = function(data)
     local value = math.floor(data.value)
@@ -143,8 +142,8 @@ Overwatch.stages.analyze_base = function(data)
             if chunk_data then
                 if chunk_data.player_value then
 
-                    -- don't track negative value chunks
-                    data.value = data.value + math.max(0, chunk_data.player_value)
+                    -- count negative value as positive, as it represents hardened player structures
+                    data.value = data.value + math.abs(chunk_data.player_value)
 
                     if chunk_data.player_value > data.best.value then
                         data.best.value = chunk_data.player_value

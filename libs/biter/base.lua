@@ -31,7 +31,7 @@ end
 -- disable logging in prod
 if not DEBUG_MODE then
     BiterBase.LogAI = function() end
-    BiterBase.Logger = function() end
+    BiterBase.Logger.log = function() end
 end
 
 local LogAI = BiterBase.LogAI
@@ -309,7 +309,7 @@ end
 BiterBase.plans = {
     idle = { passive = true, cost = 1, update_frequency = 3600 },
     no_op = { passive = false, cost = 1, update_frequency = 3600, class = require 'libs/biter/ai/no_op' },
-    identify_targets = { passive = true, cost = 500, update_frequency = 240, class = require 'libs/biter/ai/identify_targets' },
+    identify_targets = { passive = true, cost = 500, update_frequency = 100, class = require 'libs/biter/ai/identify_targets' },
     attack_area = { passive = false, cost = 3000, update_frequency = 450, class = require 'libs/biter/ai/attack_area'},
     harrassment = { passive = false, cost = 7000, update_frequency = 400, class = require 'libs/biter/ai/harrassment'},
     attacked_recently = { passive = false, cost = 240, update_frequency = 300, class = require 'libs/biter/ai/attacked_recently' },
@@ -319,12 +319,13 @@ BiterBase.plans = {
     donate_currency = { passive = true, cost = 1000, update_frequency = 1800, class = require 'libs/biter/ai/donate_currency' },
     save_currency = { passive = true, cost = 0, update_frequency = 1800, class = require 'libs/biter/ai/save_currency' },
     assist_ally = { passive = false, cost = 2000, update_frequency = 450, class = require 'libs/biter/ai/assist_ally' },
+    abandon_hive = { passive = false, cost = 0, update_frequency = 450, class = require 'libs/biter/ai/abandon_hive' },
 }
 
 function BiterBase.create_plan(base)
     LogAI("", base)
     LogAI("--------------------------------------------------", base)
-    LogAI("Choosing new plan, wallet: %s", base, serpent.line(base.currency))
+    LogAI("Choosing new plan, wallet: %s", base, string.line(base.currency))
     LogAI("Current Number of Hives in Base: %d", base, #base:all_hives())
     LogAI("Current Number of Worms in Base: %d", base, #base.worms)
 
@@ -338,7 +339,7 @@ function BiterBase.create_plan(base)
         local age = game.tick - base.targets.tick
         -- one chance in 1000 for every 3 minutes the targets have aged
         if math.random(1000) < (age / (Time.MINUTE * 3)) then
-            LogAI("Recalculating targets, previous target is %s minutes old", base, serpent.line((age / Time.MINUTE)))
+            LogAI("Recalculating targets, previous target is %s minutes old", base, string.line((age / Time.MINUTE)))
             BiterBase.set_active_plan(base, 'identify_targets')
             return true
         end
@@ -362,6 +363,20 @@ function BiterBase.create_plan(base)
         if not active_chunk and math.random(100) > 20 and base:can_afford('donate_currency') then
             LogAI("Choosing to donate currency to the overmind AI", base)
             BiterBase.set_active_plan(base, 'donate_currency')
+            return true
+        end
+    end
+
+    if not active_chunk and base.history and not base.history['attack_area'] then
+        local sum = 0
+        for plan_name, count in pairs(base.history) do
+            if plan_name ~= 'idle' and plan_name ~= 'no_op' then
+                sum = sum + count
+            end
+        end
+        if sum > 100 then
+            LogAI("Base has long history [%s], but has never attacked, choosing to abandon itself ", base, string.line(base.history))
+            BiterBase.set_active_plan(base, 'abandon_hive')
             return true
         end
     end
@@ -460,7 +475,7 @@ function BiterBase.create_entity(base, surface, entity_data)
     table.insert(base.entities, entity)
 
     if not (base:get_plan_name() == 'attacked_recently' or base:get_plan_name() == 'assist_ally') then
-        local evo_cost = 0.0000000625 * game.entity_prototypes[entity_data.name].max_health
+        local evo_cost = 0.0000000625 * game.entity_prototypes[entity_data.name].max_health / 1000
         game.evolution_factor = game.evolution_factor - evo_cost
     end
     return entity
@@ -505,7 +520,7 @@ end)
 Event.register(defines.events.on_trigger_created_entity, function(event)
     if event.entity.name == 'spawner-damaged' then
         local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
-        Log("Trigger entity created, chunk_data: %s", serpent.block(data, {comment = false}))
+        Log("Trigger entity created, chunk_data: %s", string.block(data, {comment = false}))
         if data and data.base then
             local base = BiterBase.get_base(data.base)
             base.last_attacked = event.tick
@@ -547,7 +562,7 @@ Event.register(defines.events.on_tick, function(event)
         global.tick_schedule[tick] = nil
         if tick_schedule then
             for i = #tick_schedule, 1, -1 do
-                if tick_schedule[i] then
+                if tick_schedule[i] and tick_schedule[i].valid then
                     local base = BiterBase.get_base(tick_schedule[i])
                     base.currency.amt = base.currency.amt + 1 + #base.hives
                     -- ensure metatable is set
@@ -568,7 +583,7 @@ Event.register(defines.events.on_chunk_generated, function(event)
 
     -- Run one tick later to ensure compatibility with mods that are doing stuff in on_chunk_generated
     Event.register(defines.events.on_tick, function(event)
-        Log("Chunk generated, checking area {%s} for spawners", serpent.line(area, {comment=false}))
+        Log("Chunk generated, checking area {%s} for spawners", string.line(area, {comment=false}))
         for _, spawner in pairs(surface.find_entities_filtered({area = area, type = 'unit-spawner', force = game.forces.enemy})) do
             if spawner.valid then
                 local data = Entity.get_data(spawner)

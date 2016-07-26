@@ -1,4 +1,4 @@
-DEBUG_MODE = false
+DEBUG_MODE = true
 UNIT_GROUP_EVENT_ID = script.generate_event_name()
 local wrapper = function(wrap)
     return function(msg, options)
@@ -15,13 +15,13 @@ local wrapper = function(wrap)
 end
 
 if DEBUG_MODE then
-    _ENV.serpent.line = wrapper(serpent.line)
-    _ENV.serpent.block = wrapper(serpent.block)
-    _ENV.serpent.dump = wrapper(serpent.dump)
+    string.line = wrapper(serpent.line)
+    string.block = wrapper(serpent.line)
+    string.dump = wrapper(serpent.line)
 else
-    _ENV.serpent.line = function() return '(debug mode off|serpent disabled)' end
-    _ENV.serpent.block = function() return '(debug mode off|serpent disabled)' end
-    _ENV.serpent.dump = function() return '(debug mode off|serpent disabled)' end
+    string.line = function() return 'debug mode disabled' end
+    string.block = function() return 'debug mode disabled' end
+    string.dump = function() return 'debug mode disabled' end
 end
 
 require 'stdlib/log/logger'

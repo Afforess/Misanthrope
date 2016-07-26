@@ -343,7 +343,7 @@ function Harpa.tick_emitter(entity, radius)
             end
              local status, err = pcall(biter.set_command, command)
              if not status then
-                Harpa.Logger.log("Error (" .. serpent.line(err) .. ") executing biter command command: " .. serpent.block(command))
+                Harpa.Logger.log("Error (" .. string.line(err) .. ") executing biter command command: " .. string.block(command))
             end
             table.insert(global.biter_ignore_list, {biter = biter, until_tick = game.tick + ignore_time})
         end

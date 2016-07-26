@@ -23,7 +23,7 @@ function pathfinder_demo.tick()
         elseif demo_data.started then
             global.pathfinding_demo.data = pathfinder.resume_a_star(global.pathfinding_demo.data, 10)
             local pathfinding_data = global.pathfinding_demo.data
-            --LOGGER.log("Pathfinding Data: \n" .. serpent.block(pathfinding_data, {comments = false}))
+            --LOGGER.log("Pathfinding Data: \n" .. string.block(pathfinding_data, {comments = false}))
 
             if pathfinding_data.completed then
                 demo_data.ticks_remaining = 200

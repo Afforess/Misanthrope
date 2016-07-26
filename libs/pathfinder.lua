@@ -117,7 +117,7 @@ end
 function pathfinder.step_a_star(data)
     if data.iterations > data.max_total_iterations then
         World.Logger.log(string.format("step_a_star failed, %d iterations exceeded max iterations (%d)", data.iterations, data.max_total_iterations))
-        --World.Logger.log("step_a_star state: " .. serpent.block(data))
+        --World.Logger.log("step_a_star state: " .. string.block(data))
         data.completed = true
         return nil
     end
@@ -126,7 +126,7 @@ function pathfinder.step_a_star(data)
     local current = pathfinder.lowest_f_score(data.open_set, data.f_score)
     if not current then
         World.Logger.log(string.format("step_a_star failed, %d iterations found no path to target", data.iterations))
-        --World.Logger.log("step_a_star state: " .. serpent.block(data))
+        --World.Logger.log("step_a_star state: " .. string.block(data))
         data.completed = true
         return nil
     end

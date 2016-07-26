@@ -55,7 +55,7 @@ AttackArea.stages.plan_attack = function(base, data)
     end
     local idx = math.random(#candidates)
     local candidate = table.remove(candidates, idx)
-    Log("Attack candidate: %s", base, serpent.line(candidate))
+    Log("Attack candidate: %s", base, string.line(candidate))
     if #candidates == 0 then
         base.targets = nil
     end

@@ -70,7 +70,7 @@ Overmind.stages.decide = function(data)
                 end
             end
 
-            if math.random(100) < 50 then
+            if math.random(100) < 10 then
                 Log("Overmind selects early biter spawn")
                 global.overmind.currency = global.overmind.currency - 3000
                 return 'spawn_biters'
@@ -85,19 +85,19 @@ Overmind.stages.decide = function(data)
                 return 'increase_evolution_factor'
             end
 
-            if math.random(100) < 25 then
+            if math.random(100) < 33 then
                 Log("Overmind selects spread hive spawner")
                 global.overmind.currency = global.overmind.currency - 10000
                 return 'spread_spawner'
             end
 
-            if math.random(100) < 25 and global.overmind.currency > 50000 then
+            if math.random(100) < 25 and global.overmind.currency > 200000 then
                 Log("Overmind selects donate currency to poor")
                 global.overmind.currency = global.overmind.currency - 10000
                 return 'donate_currency_to_poor'
             end
 
-            if math.random(100) < 33 and game.evolution_factor < 0.8 then
+            if math.random(100) < 10 and game.evolution_factor < 0.8 then
                 Log("Overmind selects late evolution factor boost")
                 global.overmind.currency = global.overmind.currency - 10000
                 data.extra_factor = 0.0000125
@@ -202,14 +202,14 @@ Overmind.stages.spawn_biters = function(data)
             end
         end
     end
-    Log("Spawned %d units at chunk %s, to attack %s", unit_count, Chunk.to_string(chunk), serpent.line(chunk_data.best_target))
+    Log("Spawned %d units at chunk %s, to attack %s", unit_count, Chunk.to_string(chunk), string.line(chunk_data.best_target))
     if #biters > 0 then
         local unit_group = surface.create_unit_group({position = biters[1].position, force = 'enemy'})
         for _, biter in pairs(biters) do
             unit_group.add_member(biter)
         end
         local cmd = {type = defines.command.attack_area, destination = Area.center(Chunk.to_area(chunk_data.best_target.chunk)), radius = 12}
-        Log("Attack command: %s", serpent.line(cmd))
+        Log("Attack command: %s", string.line(cmd))
         unit_group.set_command(cmd)
         unit_group.start_moving()
     end
@@ -217,7 +217,7 @@ Overmind.stages.spawn_biters = function(data)
     return 'decide'
 end
 
-Overmind.tick_rates.spread_spawner = Time.MINUTE * 4
+Overmind.tick_rates.spread_spawner = Time.MINUTE
 Overmind.stages.spread_spawner = function(data)
     Log("Attempting to spread a spawner, total valuable chunks: %d", #global.overwatch.valuable_chunks)
     local spawnable_chunks = table.filter(global.overwatch.valuable_chunks, function(data) return data.spawn end)
@@ -261,5 +261,5 @@ Overmind.stages.spread_spawner = function(data)
     return 'decide'
 end
 
-Overmind.tick_rates.fast_spread_spawner = Time.MINUTE / 6
+Overmind.tick_rates.fast_spread_spawner = Time.SECOND * 2
 Overmind.stages.fast_spread_spawner = Overmind.stages.spread_spawner
