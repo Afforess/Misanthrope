@@ -328,6 +328,8 @@ function BiterBase.create_plan(base)
     LogAI("Choosing new plan, wallet: %s", base, string.line(base.currency))
     LogAI("Current Number of Hives in Base: %d", base, #base:all_hives())
     LogAI("Current Number of Worms in Base: %d", base, #base.worms)
+    local rand = math.random(100)
+    LogAI("Rolled random (0-100): %d", base, rand)
 
     if base:can_afford('identify_targets') then
         if not base.targets then
@@ -345,23 +347,24 @@ function BiterBase.create_plan(base)
         end
     end
 
-    if math.random(100) < 33 and math.random(10000) > base.currency.savings then
+    if rand == 1 and math.random(10000) > base.currency.savings then
         LogAI("Choosing to save currency for a rainy day", base)
         BiterBase.set_active_plan(base, 'save_currency')
         return true
     end
 
+    local active_chunk = BiterBase.is_in_active_chunk(base)
+    if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
+
     if global.overmind and global.overmind.currency < 100000 then
-        if math.random(100) < 5 and base:can_afford('donate_currency') then
+        if rand == 1 and base:can_afford('donate_currency') then
             LogAI("Choosing to donate currency to the overmind AI", base)
             BiterBase.set_active_plan(base, 'donate_currency')
             return true
         end
 
-        local active_chunk = BiterBase.is_in_active_chunk(base)
-        if active_chunk then LogAI("Is in an active chunk: true", base) else LogAI("Is in an active chunk: false", base) end
-        if not active_chunk and math.random(100) > 20 and base:can_afford('donate_currency') then
-            LogAI("Choosing to donate currency to the overmind AI", base)
+        if not active_chunk and rand < 80 and base:can_afford('donate_currency') then
+            LogAI("Not in an active chunk, so choosing to donate currency to the overmind AI", base)
             BiterBase.set_active_plan(base, 'donate_currency')
             return true
         end
@@ -381,17 +384,19 @@ function BiterBase.create_plan(base)
         end
     end
 
-    if math.random(100) > 60 then
+    if rand < 33 then
+        local growth_rand = math.random(100)
+
         local wanted_hives = base:wanted_hive_count()
         LogAI("Wanted new hives: %d", base, wanted_hives)
-        if wanted_hives > 0 and base:can_afford('grow_hive') then
+        if wanted_hives > 0 and base:can_afford('grow_hive') and growth_rand < 66 then
             BiterBase.set_active_plan(base, 'grow_hive')
             return true
         end
 
         local wanted_worms = base:wanted_worm_count()
         LogAI("Wanted new worms: %d", base, wanted_worms)
-        if wanted_worms > 0 and base:can_afford('build_worm') and math.random(100) > 70 then
+        if wanted_worms > 0 and base:can_afford('build_worm') then
             BiterBase.set_active_plan(base, 'build_worm')
             return true
         end
@@ -400,19 +405,13 @@ function BiterBase.create_plan(base)
     local evo_factor = game.evolution_factor * 100
 
     if active_chunk and base:can_afford('harrassment') and base.targets then
-        local rand = math.random(100)
-        if evo_factor > 33 and rand < 7 then
-            BiterBase.set_active_plan(base, 'harrassment')
-            return true
-        end
-
-        if evo_factor > 66 and rand < 15 then
+        if (evo_factor > 33 and rand < 7) or (evo_factor > 66 and rand < 15) then
             BiterBase.set_active_plan(base, 'harrassment')
             return true
         end
     end
 
-    if math.random(100) < evo_factor and base:can_afford('attack_area') and base.targets then
+    if rand < evo_factor and base:can_afford('attack_area') and base.targets then
         if active_chunk then
             BiterBase.set_active_plan(base, 'attack_area')
             return true
@@ -485,7 +484,7 @@ function BiterBase.destroy_entity(entity)
     if not entity or not entity.valid then
         return
     end
-    local evo_cost = 0.0000000625 * game.entity_prototypes[entity.name].max_health
+    local evo_cost = 0.0000000625 * game.entity_prototypes[entity.name].max_health / 1000
     game.evolution_factor = game.evolution_factor + evo_cost
     entity.destroy()
 end
