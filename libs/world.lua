@@ -68,6 +68,21 @@ function World.migrate(old_version, new_version)
     end
     if old_version < 70 then
         global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
+            base.valid = nil
+            base.worms_pos = {}
+            if base.worms then
+                table.each(table.filter(base.worms, Game.VALID_FILTER), function(worm)
+                    table.insert(base.worms_pos, worm.position)
+                end)
+                base.worms = nil
+            end
+            base.hives_pos = {}
+            if base.hives then
+                table.each(table.filter(base.hives, Game.VALID_FILTER), function(hive)
+                    table.insert(base.hives_pos, hive.position)
+                end)
+                base.hives = nil
+            end
             if base.targets then
                 local max_candidates = math.min(20, #base.targets.candidates)
                 local base_candidates = {}
@@ -117,7 +132,7 @@ function World.get_base_at(surface, chunk)
     local area = Chunk.to_area(chunk)
     if not global.bases then return nil end
     for _, base in pairs(global.bases) do
-        if base.valid and base.queen.valid and base.queen.surface == surface then
+        if base.valid and base.surface == surface then
             if Area.inside(area, base.queen.position) then
                 return base
             end

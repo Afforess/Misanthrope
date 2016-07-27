@@ -17,7 +17,7 @@ BuildWorm.stages.build_worm = function(base, data)
     local entity_pos = surface.find_non_colliding_position(data.worm_type, pos, data.search_distance, 0.5)
     if entity_pos and Position.distance(pos, entity_pos) <= data.search_distance then
         local worm = surface.create_entity({name = data.worm_type, position = entity_pos, force = base.queen.force})
-        table.insert(base.worms, worm)
+        table.insert(base.worms_pos, worm.position)
         Log("Successfully spawned a new worm at %s", base, string.line(worm.position))
         game.evolution_factor = math.max(0, game.evolution_factor - 0.00001)
         return 'success'

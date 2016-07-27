@@ -6,18 +6,14 @@ function AbandonHive.tick(base, data)
     if global.overmind then
         global.overmind.currency = global.overmind.currency + 15000 + (10000 * #base:all_hives())
     end
-    for i = #base.hives, 1, -1 do
-        if base.hives[i] and base.hives[i].valid then
-            base.hives[i].destroy()
-        end
-    end
-    base.hives = {}
-    for i = #base.worms, 1, -1 do
-        if base.worms[i] and base.worms[i].valid then
-            base.worms[i].destroy()
-        end
-    end
-    base.worms = {}
+    table.each(base.hives, function(hive)
+        hive.destroy()
+    end)
+    base.hives_pos = {}
+    table.each(base.worms, function(worm)
+        worm.destroy()
+    end)
+    base.worms_pos = {}
     if base.queen.valid then
         base.queen.destroy()
     end

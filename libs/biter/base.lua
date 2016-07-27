@@ -128,23 +128,74 @@ function Base.set_next_tick(self, tick)
 end
 
 -- Biter Base metatable
-local BaseMt = {}
-BaseMt.__index = function(tbl, k)
-    local raw = rawget(tbl, k)
-    if raw then
-        return raw
-    else
-        if Base[k] then
-            return Base[k]
+local BaseMt = { cache_keys = { valid = true, hives = true, worms = true, surface = true, force = true, position = true, chunk_pos = true }}
+function BaseMt.new(base)
+    local self = { base = base, cache = {} }
+    self.__index = function(tbl, k)
+        local raw = rawget(tbl, k)
+        if raw then
+            return raw
+        else
+            if Base[k] then
+                return Base[k]
+            end
+            if BaseMt.cache_keys[k] then
+                local cache_value = self.cache[k]
+                if cache_value then
+                    return cache_value
+                end
+                if k == 'valid' then
+                    return self.base.queen and self.base.queen.valid
+                end
+                if k == 'surface' or k == 'force' or k == 'position' then
+                    self.cache[k] = self.base.queen[k]
+                    return self.cache[k]
+                end
+                if k == 'chunk_pos'  then
+                    self.cache[k] = Chunk.from_position(self.base.queen.position)
+                    return self.cache[k]
+                end
+                if k == 'hives' then
+                    local hives = {}
+                    if self.base.hives_pos then
+                        for idx, pos in pairs(self.base.hives_pos) do
+                            local area = Position.expand_to_area(pos, 1)
+                            local entities = base.surface.find_entities_filtered({surface = surface, area = area, force = base.force})
+                            if entities and #entities > 0 then
+                                table.insert(hives, table.first(entities))
+                            else
+                                table.remove(self.base.hives_pos, idx)
+                            end
+                        end
+                    end
+                    return hives
+                end
+                if k == 'worms' then
+                    local worms = {}
+                    if self.base.worms_pos then
+                        for idx, pos in pairs(self.base.worms_pos) do
+                            local area = Position.expand_to_area(pos, 0.5)
+                            local entities = base.surface.find_entities_filtered({surface = surface, area = area, force = base.force})
+                            if entities and #entities > 0 then
+                                table.insert(worms, table.first(entities))
+                            else
+                                table.remove(self.base.worms_pos, idx)
+                            end
+                        end
+                    end
+                    return worms
+                end
+            end
         end
+        return nil
     end
-    return nil
+    return self
 end
 
 function BiterBase.get_base(base)
     if base then
         if not getmetatable(base) then
-            setmetatable(base, BaseMt)
+            setmetatable(base, BaseMt.new(base))
         end
     end
     return base
@@ -156,7 +207,8 @@ function BiterBase.discover(entity)
     local surface = entity.surface
 
     -- initialize biter base data structure
-    local base = { queen = entity, hives = {}, worms = {}, currency = {amt = 0, savings = 0}, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}, valid = true}
+    local base = { queen = entity, hives_pos = {}, worms_pos = {}, currency = {amt = 0, savings = 0}, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}}
+    setmetatable(base, BaseMt.new(base))
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
     Log("Created new biter base {%s} at (%d, %d)", base.name, pos.x, pos.y)
@@ -168,10 +220,10 @@ function BiterBase.discover(entity)
         if spawner ~= entity then
             -- associate each of these entities with the base
             Entity.set_data(spawner, {base = base})
-            table.insert(base.hives, spawner)
+            table.insert(base.hives_pos, spawner.position)
         end
     end
-    Log("Discovered {%d} hives near %s", #base.hives, BiterBase.tostring(base))
+    Log("Discovered {%d} hives near %s", #base.hives_pos, BiterBase.tostring(base))
 
     -- scan for nearby unclaimed worms
     local worms = surface.find_entities_filtered({ area = Position.expand_to_area(pos, 48), type = 'turret', force = entity.force})
@@ -179,20 +231,19 @@ function BiterBase.discover(entity)
         -- associate each of these entities with the base
         if not Entity.get_data(worm) then
             Entity.set_data(worm, {base = base})
-            table.insert(base.worms, worm)
+            table.insert(base.worms_pos, worm.position)
         end
     end
-    Log("Discovered {%d} worms near %s", #base.worms, BiterBase.tostring(base))
+    Log("Discovered {%d} worms near %s", #base.worms_pos, BiterBase.tostring(base))
 
     local reclaimed_currency = 0
     if #base.worms > 0 then
-        local old_worms = #base.worms
+        local old_worms = #base.worms_pos
         table.each(table.filter(base.worms, function(worm) return Position.manhattan_distance(worm.position, pos) >= 8 end), function(worm)
             Entity.set_data(worm, nil)
             worm.destroy()
             reclaimed_currency = reclaimed_currency + 200
         end)
-        base.worms = table.filter(base.worms, Game.VALID_FILTER)
         Log("Removed {%d} far away worms near %s", old_worms - #base.worms, BiterBase.tostring(base))
     end
 
@@ -210,24 +261,27 @@ function BiterBase.discover(entity)
 end
 
 function BiterBase.tostring(base)
-    if base.queen.valid then
-        local pos = base.queen.position
-        return string.format("{BiterBase: (name: %s, pos: (%d, %d), size: %d)}", base.name, pos.x, pos.y, (1 + #base.hives))
+    if base.valid then
+        local pos = base.position
+        return string.format("{BiterBase: (name: %s, pos: (%d, %d), size: %d)}", base.name, pos.x, pos.y, (1 + #base.hives_pos))
     else
-        return string.format("{BiterBase: (name: %s, pos: (?, ?), size: %d)}", base.name, (#base.hives))
+        return string.format("{BiterBase: (name: %s, pos: (?, ?), size: %d)}", base.name, (#base.hives_pos))
     end
 end
 
 function BiterBase.on_queen_death(base)
     Log("Biter Base queen died at %s", BiterBase.tostring(base))
-    base.hives = table.filter(base.hives, Game.VALID_FILTER)
     if #base.hives == 0 then
         Log("%s has no remaining hives, and no queen. ", BiterBase.tostring(base))
-        base.valid = false
         global.bases = table.filter(global.bases, Game.VALID_FILTER)
     else
         local new_queen = table.remove(base.hives, 1)
         base.queen = new_queen
+        -- clear metatable cache
+        setmetatable(base, BaseMt.new(base))
+        base.hives_pos = table.filter(base.hives_pos, function(pos)
+            return not Position.equals(pos, base.position)
+        end)
         Log("%s has appointed a new queen at (%d, %d)", BiterBase.tostring(base), new_queen.position.x, new_queen.position.y)
     end
 end
@@ -240,11 +294,13 @@ Event.register(defines.events.on_tick, function(event)
         local chunk_pos = Chunk.from_position(character.position)
         local alert_area = Position.expand_to_area(chunk_pos, 3)
 
-        -- TODO: optimize away multiple api lookups for base.queen.position if > 1 player?
         if global.bases then
             for _, base in pairs(global.bases) do
-                if base.valid and base.queen.valid then
-                    local base_pos = base.queen.position
+                if not getmetatable(base) then
+                    setmetatable(base, BaseMt.new(base))
+                end
+                if base.valid then
+                    local base_pos = base.position
                     if Area.inside(alert_area, base_pos) then
                         base = BiterBase.get_base(base)
                         local plan_name = base:get_plan_name()
@@ -288,8 +344,8 @@ function BiterBase.tick(base, current_tick)
 end
 
 function BiterBase.is_in_active_chunk(base)
-    local surface = base.queen.surface
-    local pos = base.queen.position
+    local surface = base.surface
+    local pos = base.position
     local closest_dist = -1
     for _, character in pairs(World.all_characters(surface)) do
         local dist_squared = Position.distance_squared(pos, character.position)
@@ -328,8 +384,8 @@ function BiterBase.create_plan(base)
     LogAI("", base)
     LogAI("--------------------------------------------------", base)
     LogAI("Choosing new plan, wallet: %s", base, string.line(base.currency))
-    LogAI("Current Number of Hives in Base: %d", base, #base:all_hives())
-    LogAI("Current Number of Worms in Base: %d", base, #base.worms)
+    LogAI("Current Number of Hives in Base: %d", base, (#base.hives_pos + 1))
+    LogAI("Current Number of Worms in Base: %d", base, #base.worms_pos)
     local rand = math.random(100)
     LogAI("Rolled random (0-100): %d", base, rand)
 
@@ -425,6 +481,7 @@ function BiterBase.create_plan(base)
 end
 
 function BiterBase.set_active_plan(base, plan_name, extra_data)
+    base = BiterBase.get_base(base)
     local plan_specification = BiterBase.plans[plan_name]
     local data = {}
     if extra_data then
@@ -451,9 +508,6 @@ function BiterBase.set_active_plan(base, plan_name, extra_data)
         LogAI("Switching AI plan to {%s}", base, plan_name)
     end
 
-    if not getmetatable(base) then
-        setmetatable(base, BaseMt)
-    end
     base.plan = { name = plan_name, data = data, valid = true}
     base:spend_currency(plan_specification.cost)
     base:set_next_tick(game.tick + plan_specification.update_frequency)
@@ -531,7 +585,7 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
                     local pos = base.queen.position
                     local hives = table.filter(global.bases, function(ally_base)
                         ally_base = BiterBase.get_base(ally_base)
-                        if ally_base ~= base and ally_base.valid and ally_base.queen.valid and Position.distance_squared(pos, ally_base.queen.position) < 50000 then
+                        if ally_base ~= base and ally_base.valid and Position.distance_squared(pos, ally_base.queen.position) < 50000 then
                             return ally_base:get_plan_name() ~='attacked_recently'
                         end
                     end)
@@ -561,7 +615,7 @@ Event.register(defines.events.on_tick, function(event)
             for i = #tick_schedule, 1, -1 do
                 if tick_schedule[i] and tick_schedule[i].valid then
                     local base = BiterBase.get_base(tick_schedule[i])
-                    base.currency.amt = base.currency.amt + 1 + #base.hives
+                    base.currency.amt = base.currency.amt + 1 + #base.hives_pos
                     -- ensure metatable is set
                     if not base.queen.valid then
                         BiterBase.on_queen_death(base)
@@ -596,6 +650,7 @@ end)
 
 Event.register(defines.events.on_entity_died, function(event)
     local entity = event.entity
+    local entity_pos = entity.position
     if entity.type == 'unit-spawner' then
         local data = Entity.set_data(entity, nil)
         if data and data.base then
@@ -603,11 +658,9 @@ Event.register(defines.events.on_entity_died, function(event)
             if base.queen == entity then
                 BiterBase.on_queen_death(base)
             else
-                for i = #base.hives, 1, -1 do
-                    if base.hives[i] == entity then
-                        table.remove(base.hives, i)
-                    end
-                end
+                base.hives_pos = table.filter(base.hives_pos, function(pos)
+                    return not Position.equals(pos, entity_pos)
+                end)
             end
         end
     end
