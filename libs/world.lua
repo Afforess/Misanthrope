@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 69
+World.version = 70
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -65,6 +65,18 @@ function World.migrate(old_version, new_version)
         global.mod_version = 69
         global._chunk_indexes = nil
         global._chunk_data = nil
+    end
+    if old_version < 70 then
+        global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
+            if base.targets then
+                local max_candidates = math.min(20, #base.targets.candidates)
+                local base_candidates = {}
+                for i = 1, max_candidates do
+                    base_candidates[i] = base.targets.candidates[i].chunk_pos
+                end
+                base.targets.candidates = base_candidates
+            end
+        end)
     end
 end
 

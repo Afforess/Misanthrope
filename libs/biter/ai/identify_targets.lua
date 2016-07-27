@@ -65,8 +65,13 @@ IdentifyTargets.stages.sort = function(base, data)
         return 'fail'
     end
     Log("Filtered candidates: %s", base, string.block(data.candidates))
+    local max_candidates = math.min(20, #data.candidates)
+    local base_candidates = {}
+    for i = 1, max_candidates do
+        base_candidates[i] = data.candidates[i].chunk_pos
+    end
 
-    base.targets = { candidates = data.candidates, tick = game.tick }
+    base.targets = { candidates = base_candidates, tick = game.tick }
     return 'success'
 end
 

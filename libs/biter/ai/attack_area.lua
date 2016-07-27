@@ -54,13 +54,13 @@ AttackArea.stages.plan_attack = function(base, data)
         return 'fail'
     end
     local idx = math.random(#candidates)
-    local candidate = table.remove(candidates, idx)
-    Log("Attack candidate: %s", base, string.line(candidate))
+    local chunk_pos = table.remove(candidates, idx)
+    Log("Attack candidate: %s", base, Chunk.to_string(chunk_pos))
     if #candidates == 0 then
         base.targets = nil
     end
 
-    local end_pos = Area.center(Chunk.to_area(candidate.chunk_pos))
+    local end_pos = Area.center(Chunk.to_area(chunk_pos))
     data.attack_target = end_pos
     local command = {type = defines.command.attack_area, destination = end_pos, radius = 18}
     local entities = base:get_entities()
