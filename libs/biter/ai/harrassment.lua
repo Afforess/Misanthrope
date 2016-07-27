@@ -29,11 +29,11 @@ Harrassment.stages.search = function(base, data)
     end
     local chunk_pos = data.search_queue[data.search_idx]
 
-    local chunk_data = Chunk.get_data(base.queen.surface, chunk_pos)
-    if chunk_data and chunk_data.player_value and chunk_data.player_value < 0 then
+    local chunk_value = World.get_chunk_value(base.queen.surface, chunk_pos)
+    if chunk_value < 0 then
         local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
 
-        value = (chunk_data.player_value * chunk_data.player_value) / ((1 + dist) * (1 + dist))
+        value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
         if data.worst_candidate.value == nil or data.worst_candidate.value < value then
             data.worst_candidate = { chunk_pos = chunk_pos, value = value }
         end

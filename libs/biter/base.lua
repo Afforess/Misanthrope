@@ -159,8 +159,6 @@ function BiterBase.discover(entity)
     local base = { queen = entity, hives = {}, worms = {}, currency = {amt = 0, savings = 0}, name = RandomName.get_random_name(14), next_tick = game.tick + math.random(300, 1000), history = {}, valid = true}
     table.insert(global.bases, base)
     Entity.set_data(entity, {base = base})
-    local chunk_data = Chunk.get_data(surface, Chunk.from_position(pos), {})
-    chunk_data.base = base
     Log("Created new biter base {%s} at (%d, %d)", base.name, pos.x, pos.y)
 
     -- scan for nearby unclaimed hives
@@ -242,17 +240,21 @@ Event.register(defines.events.on_tick, function(event)
         local chunk_pos = Chunk.from_position(character.position)
         local alert_area = Position.expand_to_area(chunk_pos, 3)
 
-        for chunk_x, chunk_y in Area.iterate(alert_area) do
-            local chunk_data = Chunk.get_data(character.surface, {x = chunk_x, y = chunk_y})
-            if chunk_data and chunk_data.base then
-                local base = BiterBase.get_base(chunk_data.base)
-                local plan_name = base:get_plan_name()
-                if plan_name ~= 'alert' and plan_name ~= 'attacked_recently' then
-                    BiterBase.set_active_plan(base, 'alert', { alerted_at = game.tick })
+        -- TODO: optimize away multiple api lookups for base.queen.position if > 1 player?
+        if global.bases then
+            for _, base in pairs(global.bases) do
+                if base.valid and base.queen.valid then
+                    local base_pos = base.queen.position
+                    if Area.inside(alert_area, base_pos) then
+                        base = BiterBase.get_base(base)
+                        local plan_name = base:get_plan_name()
+                        if plan_name ~= 'alert' and plan_name ~= 'attacked_recently' then
+                            BiterBase.set_active_plan(base, 'alert', { alerted_at = event.tick })
+                        end
+                    end
                 end
             end
         end
-
     end
 end)
 
@@ -516,14 +518,10 @@ end)
 
 Event.register(defines.events.on_trigger_created_entity, function(event)
     if event.entity.name == 'spawner-damaged' then
-        local data = Chunk.get_data(event.entity.surface, Chunk.from_position(event.entity.position))
-        Log("Trigger entity created, chunk_data: %s", string.block(data, {comment = false}))
-        if data and data.base then
-            local base = BiterBase.get_base(data.base)
+        local base = World.get_base_at(event.entity.surface, Chunk.from_position(event.entity.position))
+        if base then
+            base = BiterBase.get_base(base)
             base.last_attacked = event.tick
-            if not base.queen.valid then
-                return
-            end
             if base:get_plan_name() ~= 'attacked_recently' then
                 BiterBase.set_active_plan(base, 'attacked_recently')
 
@@ -552,6 +550,8 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
 end)
 
 Event.register(defines.events.on_tick, function(event)
+    if not global.tick_schedule then global.tick_schedule = {} end
+
     if global.bases then
         local tick = event.tick
 

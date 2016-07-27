@@ -46,15 +46,14 @@ function World.entity_value(entity)
     return math.floor(value), math.floor(adj_value)
 end
 
+function World.chunk_index(chunk_pos)
+    return bit32.bor(bit32.lshift(bit32.band(chunk_pos.x, 0xFFFF), 16), bit32.band(chunk_pos.y, 0xFFFF))
+end
+
 function World.recalculate_chunk_values(reset)
+    if not global.chunk_values then global.chunk_values = {} end
     if reset then
-        local nauvis = game.surfaces.nauvis
-        for chunk in nauvis.get_chunks() do
-            local chunk_data = Chunk.get_data(nauvis, chunk)
-            if chunk_data then
-                chunk_data.player_value = nil
-            end
-        end
+        global.chunk_values = {}
     end
     local all_entities = Surface.find_all_entities({force = game.forces.player})
     Log("Total number of player entities: %d", #all_entities)
@@ -68,12 +67,25 @@ function World.recalculate_chunk_values(reset)
     end
 end
 
+function World.get_chunk_value(surface, chunk)
+    if not global.chunk_values then return 0 end
+    local idx = World.chunk_index(chunk)
+    local chunk_value = global.chunk_values[idx]
+    if chunk_value then
+        return chunk_value
+    end
+    return 0
+end
+
 function World.change_chunk_value(surface, chunk, value, adj_value)
-    local chunk_data = Chunk.get_data(surface, chunk, {})
-    if chunk_data.player_value then
-        chunk_data.player_value = math.floor(chunk_data.player_value + value)
+    if not global.chunk_values then global.chunk_values = {} end
+
+    local idx = World.chunk_index(chunk)
+    local chunk_value = global.chunk_values[idx]
+    if chunk_value then
+        global.chunk_values[idx] = math.floor(chunk_value + value)
     else
-        chunk_data.player_value = math.floor(value)
+        global.chunk_values[idx] = math.floor(value)
     end
     if adj_value ~= 0 then
         for x, y in Area.iterate(Position.expand_to_area(chunk, 1)) do

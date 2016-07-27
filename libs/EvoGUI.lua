@@ -39,10 +39,7 @@ function EvoGUI.create_chunk_value_text()
         local character = player.character
         if character and character.valid then
             local pos = character.position
-            local data = Chunk.get_data(character.surface, Chunk.from_position(pos))
-            if data and data.player_value then
-                return "Chunk Value: " .. data.player_value
-            end
+            return "Chunk Value: " .. World.get_chunk_value(character.surface, Chunk.from_position(pos))
         end
     end
     return "Chunk Value: 0"

@@ -138,17 +138,14 @@ Overwatch.stages.analyze_base = function(data)
         local adj_chunk = adjacent_chunks[i]
         adjacent_chunks[i] = nil
         if adj_chunk then
-            local chunk_data = Chunk.get_data(surface, adj_chunk)
-            if chunk_data then
-                if chunk_data.player_value then
+            local chunk_value = World.get_chunk_value(surface, adj_chunk)
+            if chunk_value ~= 0 then
+                -- count negative value as positive, as it represents hardened player structures
+                data.value = data.value + math.abs(chunk_value)
 
-                    -- count negative value as positive, as it represents hardened player structures
-                    data.value = data.value + math.abs(chunk_data.player_value)
-
-                    if chunk_data.player_value > data.best.value then
-                        data.best.value = chunk_data.player_value
-                        data.best.chunk = adj_chunk
-                    end
+                if chunk_value > data.best.value then
+                    data.best.value = chunk_value
+                    data.best.chunk = adj_chunk
                 end
                 if chunk_data.base then
                     if chunk_data.base.valid then

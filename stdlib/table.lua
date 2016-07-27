@@ -44,15 +44,45 @@ function table.filter(tbl, func, ...)
 end
 
 --- Given a function, apply it to each element in the table. Passes the index as second argument to the function.
+-- <p>Iteration is aborted if the applied function returns true for any element during iteration.
 -- @param tbl to be iterated
 -- @param func to apply to values
 -- @param[opt] ... additional arguments passed to the function
 -- @return the given table
 function table.each(tbl, func, ...)
     for k, v in pairs(tbl) do
-        func(v, k, ...)
+        if func(v, k, ...) then
+            break
+        end
     end
     return tbl
+end
+
+--- Returns a new table that is a one-dimensional flattening of this array (recursively).
+-- For every element that is an table, extract its elements into the new array.
+-- The optional level argument determines the level of recursion to flatten.
+-- <p>Note: does not flatten associative elements, only arrays
+-- @param tbl to be flattened
+-- @param level (optional) recursive levels, or no limit to recursion if not supplied
+-- @return a new table that represents the flattened contents of the given table
+function table.flatten(tbl, level)
+    local flattened = {}
+    table.each(tbl, function(value)
+        if type(value) == "table" and #value > 0 then
+            if level then
+                if level > 0 then
+                    table.merge(flattened, table.flatten(value, level - 1), true)
+                else
+                    table.insert(flattened, value)
+                end
+            else
+                table.merge(flattened, table.flatten(value), true)
+            end
+        else
+            table.insert(flattened, value)
+        end
+    end)
+    return flattened
 end
 
 --- Given an array, returns the first element or nil if no element exists
@@ -71,7 +101,6 @@ function table.last(tbl)
     return tbl[size]
 end
 
-
 --- Merges 2 tables, values from first get overwritten by second
 --- @usage function some_func(x, y, args)
 --  args = table.merge({option1=false}, args)
@@ -81,13 +110,21 @@ end
 -- some_func(1,2,{option1=true}) --returns 1
 -- @param tblA first table
 -- @param tblB second table
+-- @param array_merge (optional: false) whether to merge the tables as arrays, or associatively
 -- @return tblA with merged values from tblB
-function table.merge(tblA, tblB)
+function table.merge(tblA, tblB, array_merge)
     if not tblB then
         return tblA
     end
-    for k, v in pairs(tblB) do
-        tblA[k] = v
+    if array_merge then
+        for _, v in pairs(tblB) do
+            table.insert(tblA, v)
+        end
+
+    else
+        for k, v in pairs(tblB) do
+            tblA[k] = v
+        end
     end
     return tblA
 end
@@ -115,6 +152,66 @@ function table.deepcopy(object)
         return setmetatable(new_table, getmetatable(object))
     end
     return _copy(object)
+end
+
+--- Returns a copy of all of the values in the table
+-- @param tbl the table to copy the keys from, or an empty table if the tbl is nil
+-- @param sorted (optional) whether to sort the keys (slower) or keep the random order from pairs()
+-- @param as_string (optional) whether to try and parse the values as strings, or leave them as their existing type
+-- @return an array with a copy of all the values in the table
+function table.values(tbl,sorted,as_string)
+    if not tbl then return {} end
+    local valueset = {}
+    local n = 0
+    if as_string == true then --checking as_string /before/ looping is faster
+        for _,v in pairs(tbl) do n = n+1 ; valueset[n] = tostring(v) end
+    else
+        for _,v in pairs(tbl) do n = n+1 ; valueset[n] = v           end
+    end
+    if sorted == true then
+        table.sort(valueset, function(x,y) --sorts tables with mixed index types.
+            local tx = type(x) == 'number'
+            local ty = type(y) == 'number'
+            if tx == ty then
+                return x < y and true or false --similar type can be compared
+            elseif tx == true then
+                return true --only x is a number and goes first
+            else
+                return false --only y is a number and goes first
+            end
+        end)
+    end
+    return valueset
+end
+
+--- Returns a copy of all of the keys in the table
+-- @param tbl the table to copy the keys from, or an empty table if the tbl is nil
+-- @param sorted (optional) whether to sort the keys (slower) or keep the random order from pairs()
+-- @param as_string (optional) whether to try and parse the keys as strings, or leave them as their existing type
+-- @return an array with a copy of all the keys in the table
+function table.keys(tbl,sorted,as_string)
+    if not tbl then return {} end
+    local keyset = {}
+    local n = 0
+    if as_string == true then --checking as_string /before/ looping is faster
+        for k,_ in pairs(tbl) do n = n+1 ; keyset[n] = tostring(k) end
+    else
+        for k,_ in pairs(tbl) do n = n+1 ; keyset[n] = k           end
+    end
+    if sorted == true then
+        table.sort(keyset, function(x,y) --sorts tables with mixed index types.
+            local tx = type(x) == 'number'
+            local ty = type(y) == 'number'
+            if tx == ty then
+                return x < y and true or false --similar type can be compared
+            elseif tx == true then
+                return true --only x is a number and goes first
+            else
+                return false --only y is a number and goes first
+            end
+        end)
+    end
+    return keyset
 end
 
 --- Removes keys from a table (sets them to nil)

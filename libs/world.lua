@@ -5,7 +5,7 @@ require 'stdlib/surface'
 require 'libs/biter/base'
 
 World = {}
-World.version = 67
+World.version = 69
 World.Logger = Logger.new("Misanthrope", "world", DEBUG_MODE)
 local Log = function(str, ...) World.Logger.log(string.format(str, ...)) end
 
@@ -61,6 +61,11 @@ function World.migrate(old_version, new_version)
             table.insert(global.tick_schedule[base.next_tick], base)
         end)
     end
+    if old_version < 69 then
+        global.mod_version = 69
+        global._chunk_indexes = nil
+        global._chunk_data = nil
+    end
 end
 
 function World.all_characters(surface)
@@ -96,6 +101,18 @@ function World.closest_player_character(surface, pos, dist)
     return closest_char
 end
 
+function World.get_base_at(surface, chunk)
+    local area = Chunk.to_area(chunk)
+    if not global.bases then return nil end
+    for _, base in pairs(global.bases) do
+        if base.valid and base.queen.valid and base.queen.surface == surface then
+            if Area.inside(area, base.queen.position) then
+                return base
+            end
+        end
+    end
+    return nil
+end
 Event.register(defines.events.on_player_created, World.resync_players)
 
 Event.register({Event.core_events.init, Event.core_events.configuration_changed}, function(event)
