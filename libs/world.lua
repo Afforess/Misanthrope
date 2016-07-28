@@ -67,8 +67,13 @@ function World.migrate(old_version, new_version)
         global._chunk_data = nil
     end
     if old_version < 70 then
+        global.mod_version = 70
+
         global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
             base.valid = nil
+            if base.plan and base.plan.data then
+                base.plan.data.search_queue = nil
+            end
             base.worms_pos = {}
             if base.worms then
                 table.each(table.filter(base.worms, Game.VALID_FILTER), function(worm)
@@ -133,7 +138,7 @@ function World.get_base_at(surface, chunk)
     if not global.bases then return nil end
     for _, base in pairs(global.bases) do
         if base.valid and base.surface == surface then
-            if Area.inside(area, base.queen.position) then
+            if Area.inside(area, base.position) then
                 return base
             end
         end

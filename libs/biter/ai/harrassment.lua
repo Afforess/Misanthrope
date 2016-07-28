@@ -2,6 +2,20 @@
 local Harrassment = {stages = {}}
 local Log = function(str, ...) BiterBase.LogAI("[Harrassment] " .. str, ...) end
 
+Harrassment.search_radius = 14
+Harrassment.search_queue = {}
+for dx, dy in Area.spiral_iterate(Position.expand_to_area({0, 0}, Harrassment.search_radius)) do
+    table.insert(Harrassment.search_queue, {x = dx, y = dy})
+end
+Harrassment.search_queue_size = #Harrassment.search_queue
+
+function Harrassment.search_queue_chunk(base, data)
+    local idx = data.search_idx
+    local center = base.chunk_pos
+    local delta_pos = Harrassment.search_queue[idx]
+    return { x = center.x + delta_pos.x, y = center.y + delta_pos.y }
+end
+
 Harrassment.stages.attacking = function(base, data)
     return 'attacking'
 end
@@ -9,29 +23,29 @@ end
 Harrassment.stages.spawning = function(base, data)
     local command = {type = defines.command.attack_area, destination = data.target_pos, radius = 8}
     for _, hive in pairs(base:all_hives()) do
-        local biter = Biters.spawn_biter(base, data.surface, hive)
+        local biter = Biters.spawn_biter(base, base.surface, hive)
         if biter then
             biter.set_command(command)
         end
     end
+    base.entities = table.filter(base.entities, Game.VALID_FILTER)
     return 'spawning'
 end
 
 Harrassment.stages.search = function(base, data)
-    if data.search_idx > #data.search_queue then
+    if data.search_idx > Harrassment.search_queue_size then
         if not data.worst_candidate.chunk_pos then
             return 'fail'
         end
         data.end_tick = game.tick + (Time.MINUTE * math.random(3,7))
-        data.surface = base.queen.surface
         data.target_pos = Area.center(Chunk.to_area(data.worst_candidate.chunk_pos))
         return 'spawning'
     end
-    local chunk_pos = data.search_queue[data.search_idx]
+    local chunk_pos = Harrassment.search_queue_chunk(base, data)
 
-    local chunk_value = World.get_chunk_value(base.queen.surface, chunk_pos)
+    local chunk_value = World.get_chunk_value(base.surface, chunk_pos)
     if chunk_value < 0 then
-        local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
+        local dist = Position.manhattan_distance(chunk_pos, base.chunk_pos)
 
         value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
         if data.worst_candidate.value == nil or data.worst_candidate.value < value then
@@ -44,15 +58,8 @@ Harrassment.stages.search = function(base, data)
 end
 
 Harrassment.stages.setup = function(base, data)
-    local chunk_pos = Chunk.from_position(base.queen.position)
-    local search_area = Position.expand_to_area(chunk_pos, 12)
-    data.start_chunk = chunk_pos
-    data.search_queue = {}
     data.search_idx = 1
     data.worst_candidate = { chunk_pos = nil, value = nil }
-    for x, y in Area.spiral_iterate(search_area) do
-        table.insert(data.search_queue, {x = x, y = y})
-    end
     return 'search'
 end
 

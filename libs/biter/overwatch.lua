@@ -147,15 +147,19 @@ Overwatch.stages.analyze_base = function(data)
                     data.best.value = chunk_value
                     data.best.chunk = adj_chunk
                 end
-                if chunk_data.base then
-                    if chunk_data.base.valid then
-                        data.nearby_bases = data.nearby_bases + 1
-                    else
-                        chunk_data.base = nil
-                        -- remove chunk data if no entries remain
-                        if next(chunk_data) == nil then
-                            Chunk.set_data(surface, adj_chunk, nil)
+                local chunk_base = nil
+                if global.bases then
+                    global.bases = table.filter(global.bases, Game.VALID_FILTER)
+                    for _, base in pairs(global.bases) do
+                        if Position.equals(adj_chunk, base.chunk_pos) then
+                            chunk_base = base
+                            break
                         end
+                    end
+                end
+                if chunk_base then
+                    if chunk_base.valid then
+                        data.nearby_bases = data.nearby_bases + 1
                     end
                 end
             end

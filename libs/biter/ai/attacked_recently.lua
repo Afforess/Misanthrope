@@ -4,7 +4,7 @@ local Log = function(str, ...) BiterBase.LogAI("[AttackedRecently] " .. str, ...
 
 function AttackedRecently.tick(base, data)
     if #base:get_entities() < 30 then
-        local surface = base.queen.surface
+        local surface = base.surface
 
         local biters = base:get_prev_entities()
         for _, hive in pairs(base:all_hives()) do
@@ -12,8 +12,8 @@ function AttackedRecently.tick(base, data)
         end
 
         if #biters > 0 then
-            local closest_player = World.closest_player_character(surface, base.queen.position, 56)
-            local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = 'enemy'})
+            local closest_player = World.closest_player_character(surface, base.position, 56)
+            local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = base.force})
             for _, biter in pairs(biters) do
                 unit_group.add_member(biter)
             end
@@ -26,7 +26,7 @@ function AttackedRecently.tick(base, data)
                     data.idle_unit_groups = nil
                 end
             else
-                unit_group.set_command({type = defines.command.attack_area, destination = base.queen.position, radius = 20})
+                unit_group.set_command({type = defines.command.attack_area, destination = base.position, radius = 20})
                 if not data.idle_unit_groups then data.idle_unit_groups = {} end
                 table.insert(data.idle_unit_groups, unit_group)
             end

@@ -26,18 +26,18 @@ AttackArea.stages.attacking = function(base, data)
 end
 
 AttackArea.stages.spawning = function(base, data)
-    local surface = base.queen.surface
+    local surface = base.surface
 
     local biters = base:get_prev_entities()
     for _, hive in pairs(base:all_hives()) do
         table.insert(biters, Biters.spawn_biter(base, surface, hive))
     end
     if #biters > 0 then
-        local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = 'enemy'})
+        local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = base.force})
         for _, biter in pairs(biters) do
             unit_group.add_member(biter)
         end
-        unit_group.set_command({type = defines.command.attack_area, destination = base.queen.position, radius = 8})
+        unit_group.set_command({type = defines.command.attack_area, destination = base.position, radius = 8})
         unit_group.start_moving()
     end
 

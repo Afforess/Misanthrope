@@ -4,7 +4,7 @@ local Log = function(str, base, ...) BiterBase.Logger.log(string.format("[Alert]
 
 function Alert.tick(base, data)
     if #base:get_entities() < 15 then
-        local surface = base.queen.surface
+        local surface = base.surface
 
         local biters = base:get_prev_entities()
         for _, hive in pairs(base:all_hives()) do
@@ -12,12 +12,12 @@ function Alert.tick(base, data)
         end
 
         if #biters > 0 then
-            local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = 'enemy'})
+            local unit_group = BiterBase.create_unit_group(base, {position = biters[1].position, force = base.force})
             for _, biter in pairs(biters) do
                 unit_group.add_member(biter)
             end
             -- normal wander behavior
-            unit_group.set_command({type = defines.command.attack_area, destination = base.queen.position, radius = 16})
+            unit_group.set_command({type = defines.command.attack_area, destination = base.position, radius = 16})
             unit_group.start_moving()
         end
     end

@@ -1,4 +1,4 @@
-DEBUG_MODE = true
+DEBUG_MODE = false
 UNIT_GROUP_EVENT_ID = script.generate_event_name()
 local wrapper = function(wrap)
     return function(msg, options)

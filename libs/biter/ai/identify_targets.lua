@@ -10,16 +10,14 @@ for dx, dy in Area.spiral_iterate(Position.expand_to_area({0, 0}, IdentifyTarget
 end
 IdentifyTargets.search_queue_size = #IdentifyTargets.search_queue
 
-function IdentifyTargets.search_queue_chunk(data)
+function IdentifyTargets.search_queue_chunk(base, data)
     local idx = data.search_idx
-    local center = data.start_chunk
+    local center = base.chunk_pos
     local delta_pos = IdentifyTargets.search_queue[idx]
     return { x = center.x + delta_pos.x, y = center.y + delta_pos.y }
 end
 
 IdentifyTargets.stages.setup = function(base, data)
-    local chunk_pos = Chunk.from_position(base.queen.position)
-    data.start_chunk = chunk_pos
     data.search_idx = 1
     data.candidates = {}
     data.path_finding = { idx = 1, path_id = -1}
@@ -31,11 +29,11 @@ IdentifyTargets.stages.search = function(base, data)
     if data.search_idx > IdentifyTargets.search_queue_size then
         return 'sort'
     end
-    local chunk_pos = IdentifyTargets.search_queue_chunk(data)
+    local chunk_pos = IdentifyTargets.search_queue_chunk(base, data)
 
-    local chunk_value = World.get_chunk_value(base.queen.surface, chunk_pos)
+    local chunk_value = World.get_chunk_value(base.surface, chunk_pos)
     if chunk_value > 0 then
-        local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
+        local dist = Position.manhattan_distance(chunk_pos, base.chunk_pos)
 
         value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
         table.insert(data.candidates, { chunk_pos = chunk_pos, value = math.floor(value)})

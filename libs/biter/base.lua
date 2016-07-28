@@ -41,7 +41,8 @@ local Base = {}
 
 function Base.get_entities(self)
     if self.entities then
-        return table.filter(self.entities, Game.VALID_FILTER)
+        self.entities = table.filter(self.entities, Game.VALID_FILTER)
+        return self.entities
     end
     return {}
 end
@@ -71,7 +72,7 @@ function Base.wanted_hive_count(self)
     if evo_factor > 0.5 then
         evo_factor_hives = math.floor(evo_factor_hives * 3 / 2)
     end
-    local pollution = self.queen.surface.get_pollution(self.queen.position)
+    local pollution = self.surface.get_pollution(self.queen.position)
     local pollution_hives = math.floor(math.min(5, pollution / 1000))
     return math.max(0, 1 + evo_factor_hives + pollution_hives - #self:all_hives())
 end
@@ -545,7 +546,7 @@ end
 
 function BiterBase.create_unit_group(base, data)
     if not global.unit_groups then global.unit_groups = {} end
-    local unit_group = base.queen.surface.create_unit_group(data)
+    local unit_group = base.surface.create_unit_group(data)
     table.insert(global.unit_groups, {unit_group, unit_group.state, game.tick, base})
     return unit_group
 end
@@ -585,7 +586,7 @@ Event.register(defines.events.on_trigger_created_entity, function(event)
                     local pos = base.queen.position
                     local hives = table.filter(global.bases, function(ally_base)
                         ally_base = BiterBase.get_base(ally_base)
-                        if ally_base ~= base and ally_base.valid and Position.distance_squared(pos, ally_base.queen.position) < 50000 then
+                        if ally_base ~= base and ally_base.valid and Position.distance_squared(pos, ally_base.position) < 50000 then
                             return ally_base:get_plan_name() ~='attacked_recently'
                         end
                     end)

@@ -3,8 +3,8 @@ local BuildWorm = {stages = {}}
 local Log = function(str, ...) BiterBase.LogAI("[BuildWorm] " .. str, ...) end
 
 BuildWorm.stages.clear_trees = function(base, data)
-    local surface = base.queen.surface
-    local pos = base.queen.position
+    local surface = base.surface
+    local pos = base.position
     table.each(surface.find_entities_filtered({area = Position.expand_to_area(pos, data.search_distance), type = 'tree'}), function(entity)
         entity.destroy()
     end)
@@ -12,11 +12,11 @@ BuildWorm.stages.clear_trees = function(base, data)
 end
 
 BuildWorm.stages.build_worm = function(base, data)
-    local surface = base.queen.surface
-    local pos = base.queen.position
+    local surface = base.surface
+    local pos = base.position
     local entity_pos = surface.find_non_colliding_position(data.worm_type, pos, data.search_distance, 0.5)
     if entity_pos and Position.distance(pos, entity_pos) <= data.search_distance then
-        local worm = surface.create_entity({name = data.worm_type, position = entity_pos, force = base.queen.force})
+        local worm = surface.create_entity({name = data.worm_type, position = entity_pos, force = base.force})
         table.insert(base.worms_pos, worm.position)
         Log("Successfully spawned a new worm at %s", base, string.line(worm.position))
         game.evolution_factor = math.max(0, game.evolution_factor - 0.00001)
