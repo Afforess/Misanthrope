@@ -67,6 +67,10 @@ function World.migrate(old_version, new_version)
         global._chunk_data = nil
     end
     if old_version < 70 then
+        global.mod_version = 70
+        if global.overmind then
+            global.overmind.last_evo_boost = 0
+        end
         global.bases = table.each(table.filter(global.bases, Game.VALID_FILTER), function(base)
             if base.targets then
                 local max_candidates = math.min(20, #base.targets.candidates)

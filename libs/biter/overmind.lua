@@ -12,7 +12,7 @@ local Log = function(str, ...) Overmind.Logger.log(string.format(str, ...)) end
 
 Event.register(defines.events.on_tick, function(event)
     if not global.overmind then
-        global.overmind = { tick_rate = 600, currency = 0, stage = 'decide', data = {}, tracked_entities = {} }
+        global.overmind = { tick_rate = 600, currency = 0, stage = 'decide', data = {}, tracked_entities = {}, last_evo_boost = 0 }
     end
     if not (event.tick % global.overmind.tick_rate == 0) then return end
 
@@ -97,7 +97,7 @@ Overmind.stages.decide = function(data)
                 return 'donate_currency_to_poor'
             end
 
-            if math.random(100) < 10 and game.evolution_factor < 0.8 then
+            if math.random(100) < 10 and game.evolution_factor < 0.8 and (global.overmind.last_evo_boost + Time.MINUTE * 30) < game.tick then
                 Log("Overmind selects late evolution factor boost")
                 global.overmind.currency = global.overmind.currency - 10000
                 data.extra_factor = 0.0000125

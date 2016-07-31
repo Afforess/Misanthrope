@@ -41,7 +41,8 @@ local Base = {}
 
 function Base.get_entities(self)
     if self.entities then
-        return table.filter(self.entities, Game.VALID_FILTER)
+        self.entities = table.filter(self.entities, Game.VALID_FILTER)
+        return self.entities
     end
     return {}
 end

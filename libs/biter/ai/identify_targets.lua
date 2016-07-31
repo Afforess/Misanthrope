@@ -38,7 +38,7 @@ IdentifyTargets.stages.search = function(base, data)
         local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
 
         value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
-        table.insert(data.candidates, { chunk_pos = chunk_pos, value = value})
+        table.insert(data.candidates, { chunk_pos = chunk_pos, value = math.floor(value)})
     end
 
     data.search_idx = data.search_idx + 1
