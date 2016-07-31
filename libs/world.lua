@@ -129,7 +129,8 @@ function World.get_base_at(surface, chunk)
     end
     return nil
 end
-Event.register(defines.events.on_player_created, World.resync_players)
+
+Event.register({defines.events.on_player_created, defines.events.on_player_joined_game, defines.events.on_player_left_game}, World.resync_players)
 
 Event.register({Event.core_events.init, Event.core_events.configuration_changed}, function(event)
     Log("Setting up world...")
