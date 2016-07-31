@@ -86,7 +86,7 @@ end
 
 function World.all_characters(surface)
     local characters = {}
-    for idx, player in pairs(global.players) do
+    for idx, player in pairs(game.players) do
         if player.valid and player.connected then
             local character = player.character
             if character and character.valid and (surface == nil or character.surface == surface) then
@@ -95,13 +95,6 @@ function World.all_characters(surface)
         end
     end
     return characters
-end
-
-function World.resync_players()
-    global.players = {}
-    for _, player in pairs(game.players) do
-        table.insert(global.players, player)
-    end
 end
 
 function World.closest_player_character(surface, pos, dist)
@@ -129,8 +122,6 @@ function World.get_base_at(surface, chunk)
     end
     return nil
 end
-
-Event.register({defines.events.on_player_created, defines.events.on_player_joined_game, defines.events.on_player_left_game}, World.resync_players)
 
 Event.register({Event.core_events.init, Event.core_events.configuration_changed}, function(event)
     Log("Setting up world...")

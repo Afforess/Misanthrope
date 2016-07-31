@@ -234,7 +234,6 @@ function BiterBase.on_queen_death(base)
 end
 
 Event.register(defines.events.on_tick, function(event)
-    if not global.players then World.resync_players() end
     if not (event.tick % Time.SECOND == 0) then return end
 
     for _, character in pairs(World.all_characters()) do
