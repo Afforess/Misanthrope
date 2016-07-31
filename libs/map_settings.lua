@@ -26,7 +26,7 @@ Event.register(defines.events.on_tick, function(event)
         end
         global.evo_modifier = 0
         if evo_factor > 0.4 and not Evolution.is_any_laser_turrets_researched() then
-            global.evo_modifier = ((evo_factor - 0.1) / 6) / 60
+            global.evo_modifier = ((evo_factor - 0.4) / 6) / 60
         elseif evo_factor > 0.1 and not Evolution.is_any_turrets_researched() then
             global.evo_modifier = ((evo_factor - 0.1) / 2) / 60
         end
