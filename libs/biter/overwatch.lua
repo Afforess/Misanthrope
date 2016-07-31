@@ -147,17 +147,6 @@ Overwatch.stages.analyze_base = function(data)
                     data.best.value = chunk_value
                     data.best.chunk = adj_chunk
                 end
-                if chunk_data.base then
-                    if chunk_data.base.valid then
-                        data.nearby_bases = data.nearby_bases + 1
-                    else
-                        chunk_data.base = nil
-                        -- remove chunk data if no entries remain
-                        if next(chunk_data) == nil then
-                            Chunk.set_data(surface, adj_chunk, nil)
-                        end
-                    end
-                end
             end
         end
     end

@@ -23,8 +23,6 @@ function World.setup()
         World.migrate(global.mod_version, World.version)
         global.mod_version = World.version
     end
-
-    World.resync_players()
 end
 
 function World.migrate(old_version, new_version)
@@ -36,7 +34,6 @@ function World.migrate(old_version, new_version)
 
         Harpa.migrate(old_global)
         World.recalculate_chunk_values()
-        World.resync_players()
         global.bases = {}
         for _, spawner in pairs(Surface.find_all_entities({ type = 'unit-spawner', surface = 'nauvis' })) do
             -- may already be dead if it was discovered and killed
