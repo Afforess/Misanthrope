@@ -221,7 +221,7 @@ function Harpa.has_micro_emitter(player)
     if player.valid and player.connected then
         --local armor = player.get_inventory(defines.inventory.player_armor)[1]
         local armor = Harpa.get_player_armor(player)
-        if armor ~= nil and (armor.valid_for_read and armor.has_grid) then
+        if armor ~= nil and (armor.valid_for_read and armor.grid) then
             local grid = armor.grid
             for _, equipment in pairs(grid.equipment) do
                 if equipment.name == "micro-biter-emitter" then

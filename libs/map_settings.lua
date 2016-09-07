@@ -1,6 +1,9 @@
 require 'stdlib/event/event'
 
 Event.register(defines.events.on_tick, function(event)
+    if not global.evo_modifier then
+        global.evo_modifier = 0
+    end
     -- enforce map settings
     if event.tick % 3600 == 0 then
         local map_settings = game.map_settings
