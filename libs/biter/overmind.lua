@@ -208,7 +208,7 @@ Overmind.stages.spawn_biters = function(data)
         for _, biter in pairs(biters) do
             unit_group.add_member(biter)
         end
-        local cmd = {type = defines.command.attack_area, destination = Area.center(Chunk.to_area(chunk_data.best_target.chunk)), radius = 12}
+        local cmd = {type = defines.command.attack_area, destination = chunk_center, radius = 12}
         Log("Attack command: %s", string.line(cmd))
         unit_group.set_command(cmd)
         unit_group.start_moving()
