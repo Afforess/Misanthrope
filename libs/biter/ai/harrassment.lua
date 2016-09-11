@@ -11,7 +11,7 @@ Harrassment.search_queue_size = #Harrassment.search_queue
 
 function Harrassment.search_queue_chunk(base, data)
     local idx = data.search_idx
-    local center = Chunk.from_position(base.queen.position)
+    local center = data.start_chunk
     local delta_pos = Harrassment.search_queue[idx]
     return { x = center.x + delta_pos.x, y = center.y + delta_pos.y }
 end
@@ -48,7 +48,7 @@ Harrassment.stages.search = function(base, data)
     if chunk_value < 0 then
         local dist = Position.manhattan_distance(chunk_pos, data.start_chunk)
 
-        value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
+        local value = (chunk_value * chunk_value) / ((1 + dist) * (1 + dist))
         if data.worst_candidate.value == nil or data.worst_candidate.value < value then
             data.worst_candidate = { chunk_pos = chunk_pos, value = math.floor(value) }
         end
@@ -60,6 +60,7 @@ end
 
 Harrassment.stages.setup = function(base, data)
     data.search_idx = 1
+    data.start_chunk = Chunk.from_position(base.queen.position)
     data.worst_candidate = { chunk_pos = nil, value = nil }
     return 'search'
 end
