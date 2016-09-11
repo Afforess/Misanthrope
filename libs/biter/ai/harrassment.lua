@@ -11,7 +11,7 @@ Harrassment.search_queue_size = #Harrassment.search_queue
 
 function Harrassment.search_queue_chunk(base, data)
     local idx = data.search_idx
-    local center = base.chunk_pos
+    local center = Chunk.from_position(base.queen.position)
     local delta_pos = Harrassment.search_queue[idx]
     return { x = center.x + delta_pos.x, y = center.y + delta_pos.y }
 end
