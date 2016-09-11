@@ -10,15 +10,19 @@ function Harpa.migrate(old_global)
 end
 
 function Harpa.setup()
-    for _, field_name in pairs({"harpa_list", "idle_harpa_list", "unpowered_harpa_list", "biter_ignore_list", "harpa_overlays"}) do
+    for _, field_name in pairs({"harpa_list", "idle_harpa_list", "unpowered_harpa_list", "biter_ignore_list", "harpa_overlays", "micro_harpa_players", "idle_micro_harpa_players"}) do
         if not global[field_name] then
             global[field_name] = {}
         end
     end
 end
 
-function Harpa.register(entity, player_idx)
+Event.register(defines.events.on_tick, function(event)
+    Event.remove(defines.events.on_tick, event._handler)
     Harpa.setup()
+end)
+
+function Harpa.register(entity, player_idx)
     if Harpa.is_powered(entity, nil) then
         if player_idx then
             Harpa.create_overlay(entity, player_idx)
@@ -30,9 +34,6 @@ function Harpa.register(entity, player_idx)
 end
 
 function Harpa.update_power_grid(position, range, ignore_entity)
-    if not global.unpowered_harpa_list then
-        return
-    end
     local range_squared = range * range
 
     -- check inactive emitters to see if they gained power
@@ -95,9 +96,6 @@ function Harpa.create_overlay(entity, player_idx)
 end
 
 function Harpa.update_overlays()
-    if not global.harpa_overlays then
-        return
-    end
     for i = #global.harpa_overlays, 1, -1 do
         local overlay = global.harpa_overlays[i]
         if overlay.radius < 30 and overlay.harpa.valid and overlay.ticks_remaining % 15 == 0 then
@@ -176,54 +174,79 @@ Event.register(defines.events.on_player_mined_item, function(event)
 end)
 
 Event.register(defines.events.on_tick, function(event)
-    if global.harpa_list then
-        if not global.idle_harpa_list then global.idle_harpa_list = {} end
-        Harpa.setup()
-        Harpa.update_overlays()
+    Harpa.update_overlays()
 
-        -- check idle emitters less often
-        if event.tick % 150 == 0 then
-            for i = #global.idle_harpa_list, 1, -1 do
-                local harpa = global.idle_harpa_list[i]
-                if not harpa.valid then
+    -- check idle emitters less often
+    if event.tick % 150 == 0 then
+        for i = #global.idle_harpa_list, 1, -1 do
+            local harpa = global.idle_harpa_list[i]
+            if not harpa.valid then
+                table.remove(global.idle_harpa_list, i)
+            else
+                -- validate that emitter is still idle
+                if not Harpa.is_idle(harpa, 32) then
                     table.remove(global.idle_harpa_list, i)
-                else
-                    -- validate that emitter is still idle
-                    if not Harpa.is_idle(harpa, 32) then
-                        table.remove(global.idle_harpa_list, i)
-                        table.insert(global.harpa_list, harpa)
-                    end
+                    table.insert(global.harpa_list, harpa)
                 end
             end
         end
+    end
 
-        for i = #global.harpa_list, 1, -1 do
-            local harpa = global.harpa_list[i]
-            if not harpa.valid then
-                table.remove(global.harpa_list, i)
-            else
-                -- check to see if emitter is idle, and we can update it less often
-                if event.tick % 150 == 0 then
-                    if Harpa.is_idle(harpa, 32) then
-                        table.remove(global.harpa_list, i)
-                        table.insert(global.idle_harpa_list, harpa)
-                    end
+    for i = #global.harpa_list, 1, -1 do
+        local harpa = global.harpa_list[i]
+        if not harpa.valid then
+            table.remove(global.harpa_list, i)
+        else
+            -- check to see if emitter is idle, and we can update it less often
+            if event.tick % 150 == 0 then
+                if Harpa.is_idle(harpa, 32) then
+                    table.remove(global.harpa_list, i)
+                    table.insert(global.idle_harpa_list, harpa)
                 end
-
-                Harpa.tick_emitter(harpa, 30)
             end
+
+            Harpa.tick_emitter(harpa, 30)
         end
     end
     Harpa.update_power_armor()
 end)
 
+Event.register({defines.events.on_player_placed_equipment, defines.events.on_player_removed_equipment}, function(event)
+    local player_index = event.player_index
+
+    -- examine harpa status on the next tick
+    Event.register(defines.events.on_tick, function(event)
+        Event.remove(defines.events.on_tick, event._handler)
+
+        local player = game.players[player_index]
+        if Harpa.has_micro_emitter(player) then
+            Harpa.track_micro_emitter(player)
+        end
+    end)
+end)
+
+function Harpa.track_micro_emitter(player)
+    -- prevent duplicate entries
+    for i = #global.micro_harpa_players, 1, -1 do
+        if (player == global.micro_harpa_players[i]) then
+            return
+        end
+    end
+    for i = #global.idle_micro_harpa_players, 1, -1 do
+        if (player == global.idle_micro_harpa_players[i]) then
+            return
+        end
+    end
+    table.insert(global.micro_harpa_players, player)
+end
+
 function Harpa.has_micro_emitter(player)
-    if player.valid and player.connected then
+    if player and player.valid and player.connected then
         --local armor = player.get_inventory(defines.inventory.player_armor)[1]
         local armor = Harpa.get_player_armor(player)
-        if armor ~= nil and (armor.valid_for_read and armor.grid) then
-            local grid = armor.grid
-            for _, equipment in pairs(grid.equipment) do
+        local equipment_grid = Harpa.get_equipment_grid(armor)
+        if equipment_grid then
+            for _, equipment in pairs(equipment_grid.equipment) do
                 if equipment.name == "micro-biter-emitter" then
                     return true
                 end
@@ -231,6 +254,20 @@ function Harpa.has_micro_emitter(player)
         end
     end
     return false
+end
+
+function Harpa.get_equipment_grid(item)
+    if not item then
+        return nil
+    end
+    if not item.valid_for_read then
+        return nil
+    end
+    local status, value = pcall(function() return item.grid end)
+    if status then
+        return value
+    end
+    return nil
 end
 
 function Harpa.get_player_armor(player)
@@ -242,26 +279,38 @@ function Harpa.get_player_armor(player)
 end
 
 function Harpa.update_power_armor()
-    -- hack because we can not tell when armor modules change, so check every 2s for players with micro harpa emitter
-    if game.tick % 120 == 0 then
-        global.micro_harpa_players = {}
-        for i = 1, #game.players do
-            local player = game.players[i]
-            if Harpa.has_micro_emitter(player) and not Harpa.is_idle(player, 20) then
-                Harpa.setup()
-                table.insert(global.micro_harpa_players, player)
+    local idle_check = game.tick % 120 == 0
+
+    -- check all idle micro emitters, and return active emitters to service
+    if game.tick % 150 == 0 then
+        for i = #global.idle_micro_harpa_players, 1, -1 do
+            local player = global.idle_micro_harpa_players[i]
+            if Harpa.has_micro_emitter(player) then
+                if Harpa.is_idle(player, 20) then
+                    -- do nothing, still idle
+                else
+                    -- return to active status
+                    table.remove(global.idle_micro_harpa_players, i)
+                    table.insert(global.micro_harpa_players, player)
+                end
+            else
+                table.remove(global.idle_micro_harpa_players, i)
             end
         end
     end
-    if global.micro_harpa_players then
-        for i = #global.micro_harpa_players, 1, -1 do
-            local player = global.micro_harpa_players[i]
-            if Harpa.has_micro_emitter(player) then
-                Harpa.setup()
-                Harpa.tick_emitter(player, 16)
-            else
+    -- update all active micro emitters
+    for i = #global.micro_harpa_players, 1, -1 do
+        local player = global.micro_harpa_players[i]
+        if Harpa.has_micro_emitter(player) then
+            -- only test if HARPA is idle every 120 ticks, it is expensive
+            if idle_check and Harpa.is_idle(player, 20) then
+                table.insert(global.idle_micro_harpa_players, player)
                 table.remove(global.micro_harpa_players, i)
+            else
+                Harpa.tick_emitter(player, 16)
             end
+        else
+            table.remove(global.micro_harpa_players, i)
         end
     end
 end
@@ -360,14 +409,12 @@ function Harpa.tick_emitter(entity, radius)
 end
 
 function Harpa.ignore_biter(entity)
-    if global.biter_ignore_list then
-        for i = #global.biter_ignore_list, 1, -1 do
-            local biter_data = global.biter_ignore_list[i]
-            if not biter_data.biter.valid or game.tick > biter_data.until_tick then
-                table.remove(global.biter_ignore_list, i)
-            elseif biter_data.biter == entity then
-                return true
-            end
+    for i = #global.biter_ignore_list, 1, -1 do
+        local biter_data = global.biter_ignore_list[i]
+        if not biter_data.biter.valid or game.tick > biter_data.until_tick then
+            table.remove(global.biter_ignore_list, i)
+        elseif biter_data.biter == entity then
+            return true
         end
     end
     return false
