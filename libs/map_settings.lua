@@ -1,4 +1,6 @@
 require 'stdlib/event/event'
+require 'stdlib/table'
+require 'stdlib/string'
 
 Event.register(defines.events.on_tick, function(event)
     if not global.evo_modifier then

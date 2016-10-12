@@ -26,13 +26,14 @@ end
 
 require 'stdlib/log/logger'
 require 'stdlib/time'
+require 'stdlib/area/chunk'
 require 'remote'
 require 'libs/EvoGUI'
 require 'libs/world'
 require 'libs/map_settings'
 require 'libs/harpa'
-require 'libs/region/biter_scents'
-require 'libs/region/chunk_value'
+-- require 'libs/region/biter_scents'
+-- require 'libs/region/chunk_value'
 
 LOGGER = Logger.new("Misanthrope", "main", DEBUG_MODE)
 

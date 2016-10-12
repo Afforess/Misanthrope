@@ -3,9 +3,13 @@ require 'stdlib/string'
 for _, prototype in pairs(data.raw["unit-spawner"]) do
     prototype.pollution_absorbtion_absolute = prototype.pollution_absorbtion_absolute / 10
     prototype.pollution_absorbtion_absolute = prototype.pollution_absorbtion_proportional / 5
-    prototype.max_count_of_owned_units = 0
-    prototype.max_friends_around_to_spawn = 0
-    prototype.spawning_cooldown = {9999999999,99999999999}
+    -- prototype.max_count_of_owned_units = 0
+    -- prototype.max_friends_around_to_spawn = 0
+    -- prototype.spawning_cooldown = {9999999999,99999999999}
+
+    prototype.max_count_of_owned_units = math.floor(prototype.max_count_of_owned_units * 3 / 2)
+    prototype.max_friends_around_to_spawn = math.floor(prototype.max_friends_around_to_spawn * 3 / 2)
+
     prototype.attack_reaction = {
         {
             range = 50,

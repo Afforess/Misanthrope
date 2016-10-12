@@ -2,7 +2,9 @@ require 'stdlib/event/event'
 require 'stdlib/log/logger'
 require 'stdlib/entity/entity'
 require 'stdlib/surface'
-require 'libs/biter/base'
+require 'stdlib/table'
+
+-- require 'libs/biter/base'
 
 World = {}
 World.version = 70
