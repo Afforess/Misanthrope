@@ -18,11 +18,11 @@ function World.setup()
         global = {}
         global.mod_version = 0
 
-        Harpa.migrate(old_global)
-        World.recalculate_chunk_values()
+        -- Harpa.migrate(old_global)
+        -- World.recalculate_chunk_values()
     end
     if World.version ~= global.mod_version then
-        World.migrate(global.mod_version, World.version)
+        --World.migrate(global.mod_version, World.version)
         global.mod_version = World.version
     end
 end
